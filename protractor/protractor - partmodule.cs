@@ -372,7 +372,7 @@ public class ProtractorModule : PartModule
                             {
                                 data = Math.Abs((360 - data) / (delta_theta));
                             }
-                            datastring = Utils.removeseconds(TimeSpan.FromSeconds(data).ToString());
+                            datastring = Utils.removeseconds(Utils.fromSeconds(data).ToString());
                         }
                         else
                         {
@@ -433,7 +433,7 @@ public class ProtractorModule : PartModule
                             else if (phitotime)
                             {
                                 phidata /= (360 / vessel.orbit.period);
-                                phidisplay = Utils.removeseconds(TimeSpan.FromSeconds(phidata).ToString());
+                                phidisplay = Utils.removeseconds(Utils.fromSeconds(phidata).ToString());
                             }
                             else
                             {
@@ -554,7 +554,7 @@ public class ProtractorModule : PartModule
                             {
                                 data = Math.Abs((360 - data) / (delta_theta));
                             }
-                            datastring = Utils.removeseconds(TimeSpan.FromSeconds(data).ToString());
+                            datastring = Utils.removeseconds(Utils.fromSeconds(data).ToString());
                         }
                         else
                         {
@@ -593,7 +593,7 @@ public class ProtractorModule : PartModule
                             else if (phitotime)
                             {
                                 phidata /= (360/vessel.orbit.period);
-                                phidisplay = Utils.removeseconds(TimeSpan.FromSeconds(phidata).ToString());
+                                phidisplay = Utils.removeseconds(Utils.fromSeconds(phidata).ToString());
                             }
                             else
                             {
