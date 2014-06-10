@@ -1,10 +1,10 @@
 {
-  "NAME": "Protractor",
-  "URL": "https://raw.githubusercontent.com/mrenigma03/protractor/master/Protractor.version",
+  "NAME": "Protractor Continued",
+  "URL": "https://raw.githubusercontent.com/RealGrep/protractor/master/Protractor.version",
   "VERSION": {
     "MAJOR": 2,
     "MINOR": 4,
-    "PATCH": 5
+    "PATCH": 52
   },
   "KSP_VERSION": {
     "MAJOR": 0,
