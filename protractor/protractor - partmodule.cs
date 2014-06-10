@@ -1292,7 +1292,7 @@ public class ProtractorModule : PartModule
                         }
                     }
                 }
-                else if (p.Modules.Contains("ModuleEnginesFx"))
+                else if (p.Modules.Contains("ModuleEnginesFX"))
                 {
                     foreach (PartModule pm in p.Modules)
                     {
