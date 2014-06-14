@@ -1,8 +1,13 @@
-﻿//author: Enigma
+﻿//Original author: Enigma
+//Development has been continued by: Addle
 //Distributed according to GNU General Public License version 3, available at http://www.gnu.org/copyleft/gpl.html. All other rights reserved.
 //no warrantees of any kind are made with distribution, including but not limited to warranty of merchantability and warranty for a particular purpose.
 
 /*
+ Changes in 2.4.6
+ * Fixed support for ModuleEngineFX
+ * Added support for using Kerbin time (for 0.23.5)
+
  Changes in 2.4.5
  * added support for ModuleEngineFX
  
@@ -1284,7 +1289,8 @@ public class ProtractorModule : PartModule
                         {
                             ModuleEngines me = (ModuleEngines)pm;
                             //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
-                            if (!me.flameout)
+                            //if (!me.flameout)
+                            if (!me.getFlameoutState)
                             {
                                 thrustmax += me.maxThrust;
                                 thrustmin += me.minThrust;
@@ -1300,7 +1306,8 @@ public class ProtractorModule : PartModule
                         {
                             ModuleEnginesFX me = (ModuleEnginesFX)pm;
                             //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
-                            if (!me.flameout)
+                            //if (!me.flameout)
+                            if (!me.getFlameoutState)
                             {
                                 thrustmax += me.maxThrust;
                                 thrustmin += me.minThrust;
