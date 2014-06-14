@@ -5,6 +5,8 @@ using System.Text;
 using KSP;
 using UnityEngine;
 
+namespace Protractor {
+
 class Utils
 {
     public static int HexToInt(char hexChar)
@@ -76,4 +78,6 @@ class Utils
             return TimeSpan.FromSeconds(seconds).ToString();
         }
     }
+}
+
 }

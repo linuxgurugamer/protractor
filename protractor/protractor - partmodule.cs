@@ -28,6 +28,7 @@ using UnityEngine;
 using System.Text.RegularExpressions;
 using System.Reflection;
 
+namespace Protractor {
 
 public class ProtractorModule : PartModule
 {
@@ -57,7 +58,7 @@ public class ProtractorModule : PartModule
         thetatotime = false,
         adjustejectangle = false,
         showmanual = true,
-        minimized = false,
+//        minimized = false,
         init = false,
         loaded = false,
         showplanets = true,
@@ -94,6 +95,10 @@ public class ProtractorModule : PartModule
     private string[]
         colheaders = new string[6] { "", "θ", "Ψ", "Δv", "Closest", "Moon Ω" };
     private string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+    public static bool isVisible = true;
+
+    private IButton button;
+
 
     private void initialize()    //initializes lists of bodies, planets, and parameters
     {
@@ -839,28 +844,35 @@ public class ProtractorModule : PartModule
 
         if (vessel == FlightGlobals.ActiveVessel && primary == this)
         {
-            
             GUI.skin = HighLogic.Skin;
-            if (HighLogic.LoadedSceneIsFlight && !FlightDriver.Pause)
+            if (!ToolbarManager.ToolbarAvailable && HighLogic.LoadedSceneIsFlight && !FlightDriver.Pause)
             {
                 if (GUI.Button(new Rect(Screen.width / 6, Screen.height - 34, 32, 32), protractoricon, iconstyle))
                 {
-                    if (minimized == true)
+                    if (isVisible == false)
                     {
-                        minimized = false;
+                        isVisible = true;
                     }
                     else
                     {
-                        minimized = true;
+                        isVisible = false;
                         approach.enabled = false;
                     }
-                };
-                if (!minimized)
-                {
-                    if (showmanual) manualwindowPos = GUILayout.Window(555, manualwindowPos, manualGUI,
-                        "Protractor v." + version, GUILayout.Width(400), GUILayout.Height(500));
-                    windowPos = GUILayout.Window(556, windowPos, mainGUI, "Protractor v." + version, GUILayout.Width(1), GUILayout.Height(1)); //367
                 }
+            }
+
+            if (isVisible)
+            {
+                if (showmanual)
+                {
+                    manualwindowPos = GUILayout.Window(555, manualwindowPos, manualGUI,
+                        "Protractor v." + version, GUILayout.Width(400), GUILayout.Height(500));
+                }
+                windowPos = GUILayout.Window(556, windowPos, mainGUI, "Protractor v." + version, GUILayout.Width(1), GUILayout.Height(1)); //367
+            }
+            else
+            {
+                approach.enabled = false;
             }
         }
     }
@@ -889,23 +901,46 @@ public class ProtractorModule : PartModule
 
             approach.material = ((MapView)GameObject.FindObjectOfType(typeof(MapView))).orbitLinesMaterial;
 
-            
+            if (ToolbarManager.ToolbarAvailable)
+            {
+                Debug.Log("Protractor: Blizzy's toolbar present");
 
-            loadicons();
+                button = ToolbarManager.Instance.add("Protractor", "protractorButton");
+                button.TexturePath = "Protractor/icon";
+                button.ToolTip = "Toggle Protractor UI";
+                button.Visibility = new GameScenesVisibility(GameScenes.FLIGHT);
+                button.OnClick += (e) =>
+                {
+                    isVisible = !isVisible;
+                };
+            }
+            else
+            {
+                Debug.Log("Protractor: Blizzy's toolbar NOT present");
+                loadicons();
+            }
             RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
             vessel.OnFlyByWire += new FlightInputCallback(fly);
         }
     }
 
+    public void OnDestroy()
+    {
+        if (button != null)
+        {
+            button.Destroy();
+        }
+    }
+
     public void Update()
     {
-        if (minimized)
+        if (isVisible)
         {
-            protractoricon = protractoriconOFF;
+            protractoricon = protractoriconON;
         }
         else
         {
-            protractoricon = protractoriconON;
+            protractoricon = protractoriconOFF;
         }
     }
 
@@ -943,7 +978,7 @@ public class ProtractorModule : PartModule
         cfg["showadvanced"] = showadvanced;
         cfg["adjustejectangle"] = adjustejectangle;
         cfg["showmanual"] = showmanual;
-        cfg["minimized"] = minimized;
+        cfg["isvisible"] = isVisible;
         cfg["showplanets"] = showplanets;
         cfg["showmoons"] = showmoons;
         cfg["showadvanced"] = showadvanced;
@@ -968,7 +1003,7 @@ public class ProtractorModule : PartModule
             showadvanced = cfg.GetValue<bool>("showadvanced");
             adjustejectangle = cfg.GetValue<bool>("adjustejectangle");
             showmanual = cfg.GetValue<bool>("showmanual");
-            minimized = cfg.GetValue<bool>("minimized");
+            isVisible = cfg.GetValue<bool>("isvisible");
             showplanets = cfg.GetValue<bool>("showplanets");
             showmoons = cfg.GetValue<bool>("showmoons");
             showdv = cfg.GetValue<bool>("showdv");
@@ -982,7 +1017,7 @@ public class ProtractorModule : PartModule
             showadvanced = true;
             adjustejectangle = false;
             showmanual = true;
-            minimized = false;
+            isVisible = true;
             showplanets = true;
             showmoons = true;
             showdv = true;
@@ -1289,7 +1324,6 @@ public class ProtractorModule : PartModule
                         {
                             ModuleEngines me = (ModuleEngines)pm;
                             //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
-                            //if (!me.flameout)
                             if (!me.getFlameoutState)
                             {
                                 thrustmax += me.maxThrust;
@@ -1306,7 +1340,6 @@ public class ProtractorModule : PartModule
                         {
                             ModuleEnginesFX me = (ModuleEnginesFX)pm;
                             //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
-                            //if (!me.flameout)
                             if (!me.getFlameoutState)
                             {
                                 thrustmax += me.maxThrust;
@@ -1352,4 +1385,6 @@ public class ProtractorModule : PartModule
         tmr();
         return (1.0 - throttle) * minthrustaccel + throttle * maxthrustaccel;
     }
+}
+
 }
