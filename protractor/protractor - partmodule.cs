@@ -4,6 +4,9 @@
 //no warrantees of any kind are made with distribution, including but not limited to warranty of merchantability and warranty for a particular purpose.
 
 /*
+ Changes in 2.4.7
+ * Added (optional) support for blizzy78's Toolbar.
+
  Changes in 2.4.6
  * Fixed support for ModuleEngineFX
  * Added support for using Kerbin time (for 0.23.5)
@@ -58,7 +61,6 @@ public class ProtractorModule : PartModule
         thetatotime = false,
         adjustejectangle = false,
         showmanual = true,
-//        minimized = false,
         init = false,
         loaded = false,
         showplanets = true,

@@ -4,11 +4,11 @@
   "VERSION": {
     "MAJOR": 2,
     "MINOR": 4,
-    "PATCH": 7
+    "PATCH": 8
   },
   "KSP_VERSION": {
     "MAJOR": 0,
-    "MINOR": 23,
-    "PATCH": 5
+    "MINOR": 24,
+    "PATCH": 0
   }
 }

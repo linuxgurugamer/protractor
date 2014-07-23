@@ -11,7 +11,6 @@ class Utils
 {
     public static int HexToInt(char hexChar)
     {
-        //string hex = "" + hexChar;
         switch (hexChar)
         {
             case '0': return 0;
