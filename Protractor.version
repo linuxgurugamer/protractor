@@ -1,10 +1,11 @@
 {
   "NAME": "Protractor Continued",
   "URL": "https://raw.githubusercontent.com/RealGrep/protractor/master/Protractor.version",
+  "DOWNLOAD" : "https://github.com/RealGrep/protractor/releases",
   "VERSION": {
     "MAJOR": 2,
     "MINOR": 4,
-    "PATCH": 10
+    "PATCH": 11
   },
   "KSP_VERSION": {
     "MAJOR": 0,
