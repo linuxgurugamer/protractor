@@ -12,6 +12,6 @@ package:
 install:
 	cp bin/Debug/protractor.dll ./Output/Protractor/Plugins/
 	cp ../Protractor.version ./Output/Protractor/
-	#cp LICENSE ./Output/Protractor/
+	cp LICENSE ./Output/Protractor/
 	#cp gpl.txt ./Output/Protractor/
 	#cp mit.txt ./Output/Protractor/

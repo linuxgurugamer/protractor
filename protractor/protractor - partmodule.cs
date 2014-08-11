@@ -54,6 +54,7 @@ namespace Protractor {
             lastknownmainbody;
         protected Rect
             manualwindowPos,
+            settingswindowPos,
             windowPos;
         private Vector2 scrollposition;
         private bool
@@ -61,6 +62,7 @@ namespace Protractor {
             thetatotime = false,
             adjustejectangle = false,
             showmanual = true,
+            showsettings = false,
             init = false,
             loaded = false,
             showplanets = true,
@@ -100,6 +102,13 @@ namespace Protractor {
             phase_angle_time,
             linetip;
         private string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+
+        // The Id of the currently selected GUI skin
+        public int skinId = 0;
+
+        public enum SkinType { Default, KSP, Compact }
+        public static GUISkin defaultSkin;
+        public static GUISkin compactSkin;
 
         // Main GUI visibility
         public static bool isVisible = true;
@@ -268,6 +277,36 @@ namespace Protractor {
                 datastyle.normal.textColor = Color.white;
                 datatitle.normal.textColor = Color.white;
             }
+        }
+
+        public void settingsGUI(int windowID)
+        {
+            GUILayout.Label("Current skin: " + (SkinType)skinId );
+            if (GUI.skin == null || skinId != 1)
+            {
+                if (GUILayout.Button("KSP skin"))
+                {
+                    LoadSkin(SkinType.KSP);
+                    skinId = 1;
+                }
+            }
+            if (GUI.skin == null || skinId != 0)
+            {
+                if (GUILayout.Button("Unity Smoke skin"))
+                {
+                    LoadSkin(SkinType.Default);
+                    skinId = 0;
+                }
+            }
+            if (GUI.skin == null || skinId != 2)
+            {
+                if (GUILayout.Button("Compact skin"))
+                {
+                    LoadSkin(SkinType.Compact);
+                    skinId = 2;
+                }
+            }
+            GUI.DragWindow();
         }
 
         public void manualGUI(int windowID)
@@ -791,6 +830,12 @@ namespace Protractor {
 
                 GUILayout.BeginVertical(GUILayout.Width(10));
                 {
+                    showsettings = GUILayout.Toggle(showsettings, "Settings", new GUIStyle(GUI.skin.button));
+                }
+                GUILayout.EndVertical();
+
+                GUILayout.BeginVertical(GUILayout.Width(10));
+                {
                     showmanual = GUILayout.Toggle(showmanual, "?", new GUIStyle(GUI.skin.button));
                 }
                 GUILayout.EndVertical();
@@ -851,13 +896,13 @@ namespace Protractor {
             }
         }
 
-        public void mainGUI(int windowID)    //gui functions
+        // GUI functions
+        public void mainGUI(int windowID)
         {
-            //GUI.skin = HighLogic.Skin;
-            GUI.skin = null;
             if (!init)
             {
-                initialize ();
+                LoadSkin((SkinType)skinId);
+                initialize();
             }
             if (vessel.mainBody != lastknownmainbody)
             {
@@ -941,8 +986,9 @@ namespace Protractor {
 
             if (vessel == FlightGlobals.ActiveVessel && primary == this)
             {
-                //GUI.skin = HighLogic.Skin;
                 GUI.skin = null;
+                LoadSkin((SkinType)skinId);
+
                 if (!ToolbarManager.ToolbarAvailable && HighLogic.LoadedSceneIsFlight && !FlightDriver.Pause)
                 {
                     if (GUI.Button(new Rect(Screen.width / 6, Screen.height - 34, 32, 32), protractoricon, iconstyle))
@@ -966,6 +1012,12 @@ namespace Protractor {
                         manualwindowPos = GUILayout.Window(555, manualwindowPos, manualGUI,
                             "Protractor v." + version, GUILayout.Width(400), GUILayout.Height(500));
                     }
+                    if (showsettings)
+                    {
+                        settingswindowPos = GUILayout.Window(557, settingswindowPos, settingsGUI,
+                            "Settings", GUILayout.Width(200), GUILayout.Height(100));
+                    }
+
                     windowPos = GUILayout.Window(556, windowPos, mainGUI, "Protractor v." + version, GUILayout.Width(1), GUILayout.Height(1)); //367
                 }
                 else
@@ -1080,16 +1132,18 @@ namespace Protractor {
             cfg["config_version"] = version;
             cfg["mainpos"] = windowPos;
             cfg["manualpos"] = manualwindowPos;
+            cfg["settingspos"] = settingswindowPos;
             cfg["showadvanced"] = showadvanced;
             cfg["adjustejectangle"] = adjustejectangle;
             cfg["showmanual"] = showmanual;
+            cfg["showsettings"] = showsettings;
             cfg["isvisible"] = isVisible;
             cfg["showplanets"] = showplanets;
             cfg["showmoons"] = showmoons;
             cfg["showadvanced"] = showadvanced;
             cfg["showdv"] = showdv;
             cfg["trackdv"] = trackdv;
-
+            cfg["skinid"] = skinId;
 
             Debug.Log("-------------Saved Protractor Settings-------------");
             cfg.save();
@@ -1103,14 +1157,18 @@ namespace Protractor {
             Debug.Log("-------------Settings Opened-------------");
             windowPos = cfg.GetValue<Rect>("mainpos", new Rect(0, 0, 0, 0));
             manualwindowPos = cfg.GetValue<Rect>("manualpos", new Rect(0, 0, 0, 0));
+            settingswindowPos = cfg.GetValue<Rect>("settingspos", new Rect(0, 0, 0, 0));
             showadvanced = cfg.GetValue<bool>("showadvanced", true);
             adjustejectangle = cfg.GetValue<bool>("adjustejectangle", false);
             showmanual = cfg.GetValue<bool>("showmanual", false);
+            showsettings = cfg.GetValue<bool>("showsettings", false);
             isVisible = cfg.GetValue<bool>("isvisible", true);
             showplanets = cfg.GetValue<bool>("showplanets", true);
             showmoons = cfg.GetValue<bool>("showmoons", true);
             showdv = cfg.GetValue<bool>("showdv", true);
             trackdv = cfg.GetValue<bool>("trackdv", true);
+
+            skinId = cfg.GetValue<int>("skinid", (int)ProtractorModule.SkinType.Default);
 
             loaded = true;  //loaded
 
@@ -1512,6 +1570,93 @@ namespace Protractor {
             return (1.0 - throttle) * minthrustaccel + throttle * maxthrustaccel;
         }
 
+        // More code from MechJeb2 for skin selection. Yay GPL3 licensing!
+        public static void CopyDefaultSkin()
+        {
+            GUI.skin = null;
+            defaultSkin = (GUISkin)GameObject.Instantiate(GUI.skin);
+        }
+
+        public static void CopyCompactSkin()
+        {
+            GUI.skin = null;
+            compactSkin = (GUISkin)GameObject.Instantiate(GUI.skin);
+            GUI.skin.name = "KSP Compact";
+            compactSkin.label.margin = new RectOffset(1, 1, 1, 1);
+            compactSkin.label.padding = new RectOffset(0, 0, 2, 2);
+            compactSkin.button.margin = new RectOffset(1, 1, 1, 1);
+            compactSkin.button.padding = new RectOffset(4, 4, 2, 2);
+            compactSkin.toggle.margin = new RectOffset(1, 1, 1, 1);
+            compactSkin.toggle.padding = new RectOffset(15, 0, 2, 0);
+            compactSkin.textField.margin = new RectOffset(1, 1, 1, 1);
+            compactSkin.textField.padding = new RectOffset(2, 2, 2, 2);
+            compactSkin.textArea.margin = new RectOffset(1, 1, 1, 1);
+            compactSkin.textArea.padding = new RectOffset(2, 2, 2, 2);
+            compactSkin.window.margin = new RectOffset(0, 0, 0, 0);
+            compactSkin.window.padding = new RectOffset(5, 5, 20, 5);
+        }
+
+        public static void LoadSkin(SkinType skinType)
+        {
+            GUI.skin = null;
+            switch (skinType)
+            {
+            case SkinType.Default:
+                if (defaultSkin == null) CopyDefaultSkin();
+                GUI.skin = defaultSkin;
+                break;
+            case SkinType.KSP:
+                GUI.skin = AssetBase.GetGUISkin("KSP window 2");
+                break;
+            case SkinType.Compact:
+                if (compactSkin == null) CopyCompactSkin();
+                GUI.skin = compactSkin;
+                break;
+            }
+
+        }
+
+        // from http://wiki.unity3d.com/index.php?title=PopupList
+        public static bool List(Rect position, ref bool showList, ref int listEntry,
+            GUIContent buttonContent, string[] list, GUIStyle listStyle)
+        {
+            return List(position, ref showList, ref listEntry, buttonContent, list, "button", "box", listStyle);
+        }
+        public static bool List(Rect position, ref bool showList, ref int listEntry, GUIContent buttonContent, string[] list,
+            GUIStyle buttonStyle, GUIStyle boxStyle, GUIStyle listStyle)
+        {
+            int controlID = GUIUtility.GetControlID(865645, FocusType.Passive);
+            bool done = false;
+            switch (Event.current.GetTypeForControl(controlID))
+            {
+            case EventType.mouseDown:
+                if (position.Contains(Event.current.mousePosition))
+                {
+                    GUIUtility.hotControl = controlID;
+                    showList = true;
+                }
+                break;
+            case EventType.mouseUp:
+                if (showList)
+                {
+                    done = true;
+                }
+                break;
+            }
+            GUI.Label(position, buttonContent, buttonStyle);
+            if (showList)
+            {
+                Rect listRect = new Rect(position.x, position.y, position.width, list.Length * 20);
+                GUI.Box(listRect, "", boxStyle);
+                listEntry = GUI.SelectionGrid(listRect, listEntry, list, 1, listStyle);
+            }
+            if (done)
+            {
+                showList = false;
+            }
+            return done;
+        }
+
 
         public static int HoursPerDay { get { return GameSettings.KERBIN_TIME ? 6 : 24; } }
         public static int DaysPerYear { get { return GameSettings.KERBIN_TIME ? 426 : 365; } }
@@ -1528,7 +1673,6 @@ namespace Protractor {
 
             try
             {
-                //string[] units = { "y", "d", "h", "m", "s" };
                 string[] postfixes = { "y ", "d ", ":", ":", "" };
                 long[] intervals = { DaysPerYear * HoursPerDay * 3600, HoursPerDay * 3600, 3600, 60, 1 };
 
@@ -1538,15 +1682,12 @@ namespace Protractor {
                     seconds *= -1;
                 }
 
-                //for (int i = 0; i < units.Length; i++)
                 for (int i = 0; i < postfixes.Length; i++)
                 {
                     long n = (long)(seconds / intervals[i]);
                     bool first = ret.Length < 2;
                     if (!first || n != 0 || i >= 2 || (i == postfixes.Length - 1 && ret == ""))
                     {
-                        //if (!first) ret += " ";
-
                         if (showSecondsDecimals && seconds < 60 && i == postfixes.Length -1)
                         {
                             ret += seconds.ToString("0." + new string('0', decimalPlaces));
@@ -1560,7 +1701,6 @@ namespace Protractor {
                             ret += n.ToString("00");
                         }
 
-                        //ret += units[i];
                         ret += postfixes[i];
                     }
                     seconds -= n * intervals[i];

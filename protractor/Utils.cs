@@ -57,27 +57,6 @@ namespace Protractor {
 
             return str.Substring(0,i);
         }
-        /*
-        public static string fromSeconds(double seconds)
-        {
-            if (GameSettings.KERBIN_TIME)
-            {
-                double s = seconds;
-
-                int days = (int)(s / (60*60*6));
-                s -= days * (60*60*6);
-                int hours = (int)(s / (60*60));
-                s -= hours * (60*60);
-                int minutes = (int)(s / 60);
-
-                return String.Format("{0}.{1}:{2}:{3}", days, hours, minutes, s);
-            }
-            else
-            {
-                return TimeSpan.FromSeconds(seconds).ToString();
-            }
-        }
-        */
     }
 
 }
