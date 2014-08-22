@@ -38,6 +38,7 @@
     <Compile Include="ToolbarWrapper.cs">
       <Link>ToolbarWrapper.cs</Link>
     </Compile>
+    <Compile Include="ProtractorRPM.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />

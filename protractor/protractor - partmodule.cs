@@ -35,18 +35,19 @@ namespace Protractor {
 
     public class ProtractorModule : PartModule
     {
-        private ProtractorModule primary = null;
+        //private ProtractorModule primary = null;
+        public static ProtractorModule primary = null;
         private GameObject approach_obj;
         private static Texture2D
             protractoriconOFF = new Texture2D(32, 32, TextureFormat.ARGB32, false),
             protractoriconON = new Texture2D(32, 32, TextureFormat.ARGB32, false),
             protractoricon = new Texture2D(30, 30, TextureFormat.ARGB32, false);
-        private Dictionary<string, Color> bodycolorlist = new Dictionary<string, Color>();
+        public Dictionary<string, Color> bodycolorlist = new Dictionary<string, Color>();
         private List<CelestialBody>
             planets,
             moons,
             bodyList;
-        private CelestialBody
+        public CelestialBody
             Sun = null,
             drawApproachToBody = null,
             focusbody = null,
@@ -87,14 +88,14 @@ namespace Protractor {
             minthrustaccel = 0,
             trackeddv = 0,
             closestApproachTime = -1;
-        private enum orbitbodytype { sun, planet, moon };
+        public enum orbitbodytype { sun, planet, moon };
 
         // Sample strings for GUI fields for font metrics
         private string[] colheaders = new string[6] { "", "θ", "Ψ", "Δv", "Closest", "Moon Ω" };
         private string[] colsamples = new string[6] { "XXXXXXXX", "Xy XXXd 00:00:00XX", "00:00:00XX", "0000.0 m/sXX", "000.00 XXXX", "Moon Ω" };
         private int[] colwidths = new int[6] { 70, 120, 63, 71, 100, 71 };
 
-        private ProtractorModule.orbitbodytype orbiting;
+        public ProtractorModule.orbitbodytype orbiting;
         private string
             phi_time,
             bodytip,
@@ -116,7 +117,7 @@ namespace Protractor {
         private IButton button;
 
         // Initializes lists of bodies, planets, and parameters
-        private void initialize()
+        internal void initialize()
         {
             if (init)
             {
@@ -125,6 +126,7 @@ namespace Protractor {
             loadsettings();
  
             Sun = Planetarium.fetch.Sun;
+            ProtractorModule.primary = this;
             getbodies();
             getplanets();
             getmoons();
@@ -133,6 +135,8 @@ namespace Protractor {
             getorbitbodytype();
 
             init = true;
+
+            LoadSkin((SkinType)skinId);
 
             boldstyle = new GUIStyle(GUI.skin.label);
             boldstyle.normal.textColor = Color.yellow;
@@ -456,38 +460,45 @@ namespace Protractor {
                         string datastring;
                         if (orbiting == orbitbodytype.moon) //get the data
                         {
+                            //Debug.Log("Protractor: Orbiting bodytype moon");
                             data = (CurrentPhase(planet) - OberthDesiredPhase(planet) + 360) % 360;
-                        }
-                        else
+                        } else
                         {
                             data = (CurrentPhase(planet) - DesiredPhase(planet) + 360) % 360;
                         }
+                        //Debug.Log("Protractor: planet: " + planet.name + "; data = " + data);
 
                         if (thetatotime)    //convert to time or leave as angle
                         {
                             double delta_theta;
                             if (orbiting == orbitbodytype.moon)
                             {
+                                // Theta = moon angle relative to dest planet
                                 CelestialBody o = vessel.orbit.referenceBody.orbit.referenceBody;
-                                delta_theta = (360 / o.orbit.period) - (360 / planet.orbit.period);
+                                delta_theta = (360.0 / o.orbit.period) - (360.0 / planet.orbit.period);
+                                //Debug.Log("moon orbit: delta_theta = " + delta_theta +
+                                //    "; o.orbital.period = " + o.orbit.period +
+                                //    "; planet.orbit.period = " + planet.orbit.period);
                             }
                             else if (orbiting == orbitbodytype.planet)
                             {
                                 CelestialBody o = vessel.orbit.referenceBody;
-                                delta_theta = (360 / o.orbit.period) - (360 / planet.orbit.period);
+                                delta_theta = (360.0 / o.orbit.period) - (360.0 / planet.orbit.period);
                             }
                             else
                             {
-                                delta_theta = (360 / vessel.orbit.period) - (360 / planet.orbit.period);
+                                delta_theta = (360.0 / vessel.orbit.period) - (360.0 / planet.orbit.period);
                             }
                             
                             if (delta_theta > 0)
                             {
+                                //Debug.Log("data: delta_theta > 0 so " + data + " / " + delta_theta + " = " + data / delta_theta);
                                 data /= delta_theta;
                             }
                             else
                             {
-                                data = Math.Abs((360 - data) / (delta_theta));
+                                //Debug.Log("data: delta_theta <= 0 so Math.abs(" + (360.0 - data) + " / " + delta_theta + " = " + Math.Abs((360.0 - data) / delta_theta));
+                                data = Math.Abs((360.0 - data) / delta_theta);
                             }
                             datastring = TimeToDHMS(data);
                         }
@@ -909,7 +920,6 @@ namespace Protractor {
         {
             if (!init)
             {
-                LoadSkin((SkinType)skinId);
                 initialize();
             }
             if (vessel.mainBody != lastknownmainbody)
@@ -1038,6 +1048,8 @@ namespace Protractor {
         public override void OnStart(PartModule.StartState state)
         {
             base.OnStart(state);
+            // MMD
+            ProtractorModule.primary = this;
             if (state != StartState.Editor)
             {
                 approach_obj = new GameObject("Line");
@@ -1769,6 +1781,8 @@ namespace Protractor {
             return ret;
         }
 
+        public List<CelestialBody> Planets { get { return planets; } }
+        public List<CelestialBody> Moons { get { return moons; } }
     } // end of class
 
 } //end of namespace
