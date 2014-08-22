@@ -4,7 +4,7 @@ Protractor was originally written by mrenigma03 and is Copyright (c) 2012-2014 b
 
 This version was modified by Michel Dusseault and parts are Copyright (c) 2014 by Michel Dusseault. The source code for it is at https://github.com/RealGrep/protractor.
 
-ToSI, TimeToDHMS and skin selection code are from MechJeb2, which is released under GNU GPL license 3. The full source for MechJeb2 is available at https://github.com/MuMech/MechJeb2.
+ToSI, TimeToDHMS and skin selection code are from MechJeb2, which is released under GNU GPL license 3. Thanks to r4m0n, The_Duck and everyone who's worked on MechJeb2. The full source for MechJeb2 is available at https://github.com/MuMech/MechJeb2.
 
 Models courtesy of Shanakin over at the SA forums, released under MIT license. You may find the text of the MIT license with this distribution in the mit.txt file.
 
