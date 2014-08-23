@@ -36,8 +36,7 @@ namespace Protractor {
     public class ProtractorModule : PartModule
     {
         private ProtractorModule primary = null;
-        private GameObject approach_obj = new GameObject("Line");
-        private KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<ProtractorModule>();
+        private GameObject approach_obj;
         private static Texture2D
             protractoriconOFF = new Texture2D(32, 32, TextureFormat.ARGB32, false),
             protractoriconON = new Texture2D(32, 32, TextureFormat.ARGB32, false),
@@ -48,7 +47,7 @@ namespace Protractor {
             moons,
             bodyList;
         private CelestialBody
-            Sun = Planetarium.fetch.Sun,
+            Sun = null,
             drawApproachToBody = null,
             focusbody = null,
             lastknownmainbody;
@@ -78,7 +77,7 @@ namespace Protractor {
             dataclose,
             dataintercept,
             tooltipstyle,
-            iconstyle = new GUIStyle();
+            iconstyle;
         private LineRenderer approach;
         private PlanetariumCamera cam;
         private double
@@ -119,6 +118,13 @@ namespace Protractor {
         // Initializes lists of bodies, planets, and parameters
         private void initialize()
         {
+            if (init)
+            {
+                return;
+            }
+            loadsettings();
+ 
+            Sun = Planetarium.fetch.Sun;
             getbodies();
             getplanets();
             getmoons();
@@ -158,6 +164,8 @@ namespace Protractor {
             dataintercept = new GUIStyle(GUI.skin.label);
             dataintercept.alignment = TextAnchor.MiddleLeft;
             dataintercept.fontStyle = FontStyle.BoldAndItalic;
+            
+            iconstyle = new GUIStyle();
 
             // Figure out the width of the fields in the GUI with a little font metrics
             // from sample strings that should be as wide as the field can be.
@@ -1032,6 +1040,7 @@ namespace Protractor {
             base.OnStart(state);
             if (state != StartState.Editor)
             {
+                approach_obj = new GameObject("Line");
                 loadsettings();
                 if ((windowPos.x == 0) && (windowPos.y == 0))//windowPos is used to position the GUI window, lets set it in the center of the screen
                 {
@@ -1129,6 +1138,7 @@ namespace Protractor {
             {
                 return;
             }
+            KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<ProtractorModule>();
             cfg["config_version"] = version;
             cfg["mainpos"] = windowPos;
             cfg["manualpos"] = manualwindowPos;
@@ -1152,7 +1162,7 @@ namespace Protractor {
         public void loadsettings()
         {
             Debug.Log("-------------Loading settings...-------------");
-
+            KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<ProtractorModule>();
             cfg.load();
             Debug.Log("-------------Settings Opened-------------");
             windowPos = cfg.GetValue<Rect>("mainpos", new Rect(0, 0, 0, 0));
