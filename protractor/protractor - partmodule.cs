@@ -199,6 +199,294 @@ namespace Protractor {
             protractoriconOFF.LoadImage(KSP.IO.File.ReadAllBytes<ProtractorModule>("protractor-off.png"));
         }
 
+        public void drawGUI()
+        {
+            primary = this;
+
+            if (!init)
+            {
+                initialize();
+            }
+
+            foreach (Part p in vessel.parts)
+            {
+                foreach (PartModule pm in p.Modules)
+                {
+                    if (pm.GetInstanceID() < this.GetInstanceID() && pm is ProtractorModule)
+                    {
+                        primary = (ProtractorModule)pm;
+                    }
+                }
+            }
+
+            if (vessel == FlightGlobals.ActiveVessel && primary == this)
+            {
+                GUI.skin = null;
+                LoadSkin((SkinType)skinId);
+
+                if (!ToolbarManager.ToolbarAvailable && HighLogic.LoadedSceneIsFlight && !FlightDriver.Pause)
+                {
+                    if (GUI.Button(new Rect(Screen.width / 6, Screen.height - 34, 32, 32), protractoricon, iconstyle))
+                    {
+                        if (isVisible == false)
+                        {
+                            isVisible = true;
+                        }
+                        else
+                        {
+                            isVisible = false;
+                            approach.enabled = false;
+                        }
+                    }
+                }
+
+                if (isVisible)
+                {
+                    if (showmanual)
+                    {
+                        manualwindowPos = GUILayout.Window(555, manualwindowPos, manualGUI,
+                            "Protractor v." + version, GUILayout.Width(400), GUILayout.Height(500));
+                    }
+                    if (showsettings)
+                    {
+                        settingswindowPos = GUILayout.Window(557, settingswindowPos, settingsGUI,
+                            "Settings", GUILayout.Width(200), GUILayout.Height(100));
+                    }
+
+                    windowPos = GUILayout.Window(556, windowPos, mainGUI, "Protractor v." + version, GUILayout.Width(1), GUILayout.Height(1)); //367
+                }
+                else
+                {
+                    approach.enabled = false;
+                }
+            }
+        }
+
+        public override void OnStart(PartModule.StartState state)
+        {
+            base.OnStart(state);
+            if (state != StartState.Editor)
+            {
+                approach_obj = new GameObject("Line");
+                loadsettings();
+                if ((windowPos.x == 0) && (windowPos.y == 0))//windowPos is used to position the GUI window, lets set it in the center of the screen
+                {
+                    windowPos = new Rect(Screen.width / 2, Screen.height / 2, 10, 10);
+                }
+
+                approach_obj.layer = 9;
+                cam = (PlanetariumCamera)GameObject.FindObjectOfType(typeof(PlanetariumCamera));
+
+                approach = approach_obj.AddComponent<LineRenderer>();
+                approach.transform.parent = null;
+                approach.enabled = false;
+                approach.SetColors(Color.green, Color.green);
+                approach.useWorldSpace = true;
+                approach.SetVertexCount(2);
+                approach.SetWidth(10, 10);  //was 15, 5
+
+                approach.material = ((MapView)GameObject.FindObjectOfType(typeof(MapView))).orbitLinesMaterial;
+
+                if (ToolbarManager.ToolbarAvailable)
+                {
+                    Debug.Log("Protractor: Blizzy's toolbar present");
+
+                    button = ToolbarManager.Instance.add("Protractor", "protractorButton");
+                    button.TexturePath = "Protractor/icon";
+                    button.ToolTip = "Toggle Protractor UI";
+                    button.Visibility = new GameScenesVisibility(GameScenes.FLIGHT);
+                    button.OnClick += (e) =>
+                    {
+                        isVisible = !isVisible;
+                    };
+                }
+                else
+                {
+                    Debug.Log("Protractor: Blizzy's toolbar NOT present");
+                    loadicons();
+                }
+                RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
+                vessel.OnFlyByWire += new FlightInputCallback(fly);
+            }
+        }
+
+        // If using Blizzy78's Toolbar, the button *must* be destroyed OnDestroy
+        public void OnDestroy()
+        {
+            if (button != null)
+            {
+                button.Destroy();
+            }
+        }
+
+        public void Update()
+        {
+            if (isVisible)
+            {
+                protractoricon = protractoriconON;
+            }
+            else
+            {
+                protractoricon = protractoriconOFF;
+            }
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            savesettings();
+            base.OnSave(node);
+        }
+
+        public void FixedUpdate()
+        {
+            if (!HighLogic.LoadedSceneIsFlight)
+            {
+                return;
+            }
+            if (vessel.situation != Vessel.Situations.PRELAUNCH)
+            {
+                totaldv += TimeWarp.fixedDeltaTime * thrustAccel();
+                if (trackdv)
+                {
+                    trackeddv += TimeWarp.fixedDeltaTime * thrustAccel();
+                }
+            }
+            base.OnFixedUpdate();
+        }
+
+        public void mainGUI(int windowID)
+        {
+            if (!init)
+            {
+                LoadSkin((SkinType)skinId);
+                initialize();
+            }
+            if (vessel.mainBody != lastknownmainbody)
+            {
+                drawApproachToBody = null;
+                getmoons();
+                getplanets();
+                lastknownmainbody = vessel.mainBody;
+                focusbody = null;
+                getorbitbodytype();
+            } //resets bodies, lines and collapse
+
+            bodytip = focusbody == null ? "Click to focus" : "Click to unfocus";
+            linetip = "Click to toggle approach line";
+            phase_angle_time = "Toggle between angle and ESTIMATED time";
+            phi_time = "Toggle between angle and ESTIMTED time";
+
+            printheaders();
+            if (showplanets)
+            {
+                printplanetdata ();
+            }
+            if (showmoons)
+            {
+                printmoondata ();
+            }
+            printvesseldata();
+            drawApproach();
+
+            if (GUI.tooltip != "")
+            {
+                int w = 7 * GUI.tooltip.Length;
+                float x = (Event.current.mousePosition.x < windowPos.width / 2) ? Event.current.mousePosition.x + 10 : Event.current.mousePosition.x - 10 - w;
+                GUI.Box(new Rect(x, Event.current.mousePosition.y, w, 30), GUI.tooltip, tooltipstyle); //resize
+            }
+            GUI.DragWindow();
+        }
+
+        public void settingsGUI(int windowID)
+        {
+            GUILayout.Label("Current skin: " + (SkinType)skinId );
+            if (GUI.skin == null || skinId != 1)
+            {
+                if (GUILayout.Button("KSP skin"))
+                {
+                    LoadSkin(SkinType.KSP);
+                    skinId = 1;
+                }
+            }
+            if (GUI.skin == null || skinId != 0)
+            {
+                if (GUILayout.Button("Unity Smoke skin"))
+                {
+                    LoadSkin(SkinType.Default);
+                    skinId = 0;
+                }
+            }
+            if (GUI.skin == null || skinId != 2)
+            {
+                if (GUILayout.Button("Compact skin"))
+                {
+                    LoadSkin(SkinType.Compact);
+                    skinId = 2;
+                }
+            }
+            GUI.DragWindow();
+        }
+
+        public void manualGUI(int windowID)
+        {
+            GUIStyle wordWrapLabelStyle;
+            wordWrapLabelStyle = new GUIStyle();
+            wordWrapLabelStyle.wordWrap = true;
+            wordWrapLabelStyle.normal.textColor = Color.white;
+
+            scrollposition = GUILayout.BeginScrollView(scrollposition, false, true,
+                GUILayout.Width(600), GUILayout.Height(600));
+            GUILayout.Label(
+                "*****Tips*****\n\n" +
+                "- Click on the icon in the bottom left to hide Protractor and its windows\n" +
+                "- Click on the number in \"Closest\" column to toggle the closest approach line on the map\n" +
+                "- Click on the name of a celestial body in the list to hide other bodies.\n" +
+                "- Click on θ in the column headers to toggle between displaying an angle and an \n" +
+                " approximate time until the next launch window in the format D.HH:MM.\n" +
+                "- When a body is focused and an intercept is detected, your predicted inclination is \n" +
+                " displayed below the closest approach.\n\n" +
+                "*****Column Key*****\n\n" +
+                "θ: Difference in the current angle between bodies and the desired angle between \n" +
+                "   them for transfer. Launch your ship when this is 0.\n\n" +
+                "Ψ: Point in vessel's current orbit (relative to orbited body's prograde) where you \n" +
+                "   should start your ejection burn. Burn when this is 0.\n\n" +
+                "Δv: Amount your current velocity needs to be changed to accomplish maneuver.\n\n" +
+                "Adjust Ψ: Used to time escape. Toggle to adjust your escape angle based on your\n" +
+                "          craft's thrust capabilities.\n\n" +
+                "Closest: The closest approach between your craft and the target during one revolution.\n\n" +
+                "*****Instructions*****\n\n" +
+                "To use this guide, time warp until \"θ\" is 0. IT IS STRONGLY SUGGESTED TO DO \n" +
+                "THIS BEFORE LAUNCHING YOUR SHIP. This means the planets are in the right \n" +
+                "position relative to each other. \n" +
+                "Launch into a low orbit, then time warp until \"Ψ\" is 0. This means your vessel is \n" +
+                "in the right place in it's orbit. \n" +
+                "For best results, click \"Adjust Ψ\" or start your ejection burn before \n" +
+                "the Ψ hits 0 so that it does so when your burn is exactly 2/3 complete. \n" +
+                "Burn in direction of vessel's prograde until \"Δv\" is approximately 0.\"\n\n" +
+                "This mod assumes your craft is in a 0-inclination, circular orbit. Target is also \n" +
+                "assumed to be in 0-inclination, circular orbit. Either a 90° or 270° heading \n" +
+                "will work, though launching to 90° is more efficient. \n" +
+                "YOU WILL HAVE TO MAKE ADJUSTMENTS TO RENDEZVOUS. THIS MOD ONLY \n" +
+                "GETS YOU IN THE NEIGHBORHOOD. To close the gap, try burning at 90° angles \n" +
+                "(pro/retro, norm/antinorm, +rad/-rad).\n" +
+                "Eventually, you'll know which way to burn to correct an orbit.\n\n" +
+                "*****Advanced*****\n\n" +
+                "Only works when orbiting a moon. This data is designed to aid in travelling from \n" +
+                "a moon, to the moon's planet, and then to another moon. (e.g. Tylo -> Jool -> Kerbin). \n" +
+                "Adds \"Moon Ω\" column representing angle from moon to the prograde of the \n" + 
+                "planet that moon orbits. \n" +
+                "\"Alt\" above represents your target periapsis around the moon's planet where you \n" +
+                "should begin your ejection burn. \"Eject from [moon]\" " + "indicates where to \n" +
+                "leave your moon's orbit. To use this mode, wait until \"θ\" is 0, \"Moon Ω\" is 0, \n" +
+                "and \"Eject from [moon]\" is 0. Burn to create an orbit with an apoapsis at your \n" +
+                "current moon and a periapsis at \"Alt\". When you reach periapsis, burn for target \n" +
+                "planet.\n",
+                wordWrapLabelStyle
+            );
+            GUILayout.EndScrollView();
+            GUI.DragWindow();
+        }
+
         public void getmoons()  //gets a list of moons
         {
             // In interstellar space
@@ -285,96 +573,6 @@ namespace Protractor {
                 datastyle.normal.textColor = Color.white;
                 datatitle.normal.textColor = Color.white;
             }
-        }
-
-        public void settingsGUI(int windowID)
-        {
-            GUILayout.Label("Current skin: " + (SkinType)skinId );
-            if (GUI.skin == null || skinId != 1)
-            {
-                if (GUILayout.Button("KSP skin"))
-                {
-                    LoadSkin(SkinType.KSP);
-                    skinId = 1;
-                }
-            }
-            if (GUI.skin == null || skinId != 0)
-            {
-                if (GUILayout.Button("Unity Smoke skin"))
-                {
-                    LoadSkin(SkinType.Default);
-                    skinId = 0;
-                }
-            }
-            if (GUI.skin == null || skinId != 2)
-            {
-                if (GUILayout.Button("Compact skin"))
-                {
-                    LoadSkin(SkinType.Compact);
-                    skinId = 2;
-                }
-            }
-            GUI.DragWindow();
-        }
-
-        public void manualGUI(int windowID)
-        {
-            GUIStyle wordWrapLabelStyle;
-            wordWrapLabelStyle = new GUIStyle();
-            wordWrapLabelStyle.wordWrap = true;
-            wordWrapLabelStyle.normal.textColor = Color.white;
-
-            scrollposition = GUILayout.BeginScrollView(scrollposition, false, true,
-                                                       GUILayout.Width(600), GUILayout.Height(600));
-            GUILayout.Label(
-                "*****Tips*****\n\n" +
-                "- Click on the icon in the bottom left to hide Protractor and its windows\n" +
-                "- Click on the number in \"Closest\" column to toggle the closest approach line on the map\n" +
-                "- Click on the name of a celestial body in the list to hide other bodies.\n" +
-                "- Click on θ in the column headers to toggle between displaying an angle and an \n" +
-                " approximate time until the next launch window in the format D.HH:MM.\n" +
-                "- When a body is focused and an intercept is detected, your predicted inclination is \n" +
-                " displayed below the closest approach.\n\n" +
-                "*****Column Key*****\n\n" +
-                "θ: Difference in the current angle between bodies and the desired angle between \n" +
-                "   them for transfer. Launch your ship when this is 0.\n\n" +
-                "Ψ: Point in vessel's current orbit (relative to orbited body's prograde) where you \n" +
-                "   should start your ejection burn. Burn when this is 0.\n\n" +
-                "Δv: Amount your current velocity needs to be changed to accomplish maneuver.\n\n" +
-                "Adjust Ψ: Used to time escape. Toggle to adjust your escape angle based on your\n" +
-                "          craft's thrust capabilities.\n\n" +
-                "Closest: The closest approach between your craft and the target during one revolution.\n\n" +
-                "*****Instructions*****\n\n" +
-                "To use this guide, time warp until \"θ\" is 0. IT IS STRONGLY SUGGESTED TO DO \n" +
-                "THIS BEFORE LAUNCHING YOUR SHIP. This means the planets are in the right \n" +
-                "position relative to each other. \n" +
-                "Launch into a low orbit, then time warp until \"Ψ\" is 0. This means your vessel is \n" +
-                "in the right place in it's orbit. \n" +
-                "For best results, click \"Adjust Ψ\" or start your ejection burn before \n" +
-                "the Ψ hits 0 so that it does so when your burn is exactly 2/3 complete. \n" +
-                "Burn in direction of vessel's prograde until \"Δv\" is approximately 0.\"\n\n" +
-                "This mod assumes your craft is in a 0-inclination, circular orbit. Target is also \n" +
-                "assumed to be in 0-inclination, circular orbit. Either a 90° or 270° heading \n" +
-                "will work, though launching to 90° is more efficient. \n" +
-                "YOU WILL HAVE TO MAKE ADJUSTMENTS TO RENDEZVOUS. THIS MOD ONLY \n" +
-                "GETS YOU IN THE NEIGHBORHOOD. To close the gap, try burning at 90° angles \n" +
-                "(pro/retro, norm/antinorm, +rad/-rad).\n" +
-                "Eventually, you'll know which way to burn to correct an orbit.\n\n" +
-                "*****Advanced*****\n\n" +
-                "Only works when orbiting a moon. This data is designed to aid in travelling from \n" +
-                "a moon, to the moon's planet, and then to another moon. (e.g. Tylo -> Jool -> Kerbin). \n" +
-                "Adds \"Moon Ω\" column representing angle from moon to the prograde of the \n" + 
-                "planet that moon orbits. \n" +
-                "\"Alt\" above represents your target periapsis around the moon's planet where you \n" +
-                "should begin your ejection burn. \"Eject from [moon]\" " + "indicates where to \n" +
-                "leave your moon's orbit. To use this mode, wait until \"θ\" is 0, \"Moon Ω\" is 0, \n" +
-                "and \"Eject from [moon]\" is 0. Burn to create an orbit with an apoapsis at your \n" +
-                "current moon and a periapsis at \"Alt\". When you reach periapsis, burn for target \n" +
-                "planet.\n",
-                wordWrapLabelStyle
-                );
-            GUILayout.EndScrollView();
-            GUI.DragWindow();
         }
 
         public void printheaders()
@@ -904,50 +1102,6 @@ namespace Protractor {
             }
         }
 
-        // GUI functions
-        public void mainGUI(int windowID)
-        {
-            if (!init)
-            {
-                LoadSkin((SkinType)skinId);
-                initialize();
-            }
-            if (vessel.mainBody != lastknownmainbody)
-            {
-                drawApproachToBody = null;
-                getmoons();
-                getplanets();
-                lastknownmainbody = vessel.mainBody;
-                focusbody = null;
-                getorbitbodytype();
-            } //resets bodies, lines and collapse
-
-            bodytip = focusbody == null ? "Click to focus" : "Click to unfocus";
-            linetip = "Click to toggle approach line";
-            phase_angle_time = "Toggle between angle and ESTIMATED time";
-            phi_time = "Toggle between angle and ESTIMTED time";
-
-            printheaders();
-            if (showplanets)
-            {
-                printplanetdata ();
-            }
-            if (showmoons)
-            {
-                printmoondata ();
-            }
-            printvesseldata();
-            drawApproach();
-
-            if (GUI.tooltip != "")
-            {
-                int w = 7 * GUI.tooltip.Length;
-                float x = (Event.current.mousePosition.x < windowPos.width / 2) ? Event.current.mousePosition.x + 10 : Event.current.mousePosition.x - 10 - w;
-                GUI.Box(new Rect(x, Event.current.mousePosition.y, w, 30), GUI.tooltip, tooltipstyle); //resize
-            }
-            GUI.DragWindow();
-        }
-
         public void drawApproach()
         {
             if (drawApproachToBody != null && MapView.MapIsEnabled && closestApproachTime > 0)
@@ -977,161 +1131,14 @@ namespace Protractor {
 
         }
 
-        public void drawGUI()
-        {
-            primary = this;
-
-            foreach (Part p in vessel.parts)
-            {
-                foreach (PartModule pm in p.Modules)
-                {
-                    if (pm.GetInstanceID() < this.GetInstanceID() && pm is ProtractorModule)
-                    {
-                        primary = (ProtractorModule)pm;
-                    }
-                }
-            }
-
-            if (vessel == FlightGlobals.ActiveVessel && primary == this)
-            {
-                GUI.skin = null;
-                LoadSkin((SkinType)skinId);
-
-                if (!ToolbarManager.ToolbarAvailable && HighLogic.LoadedSceneIsFlight && !FlightDriver.Pause)
-                {
-                    if (GUI.Button(new Rect(Screen.width / 6, Screen.height - 34, 32, 32), protractoricon, iconstyle))
-                    {
-                        if (isVisible == false)
-                        {
-                            isVisible = true;
-                        }
-                        else
-                        {
-                            isVisible = false;
-                            approach.enabled = false;
-                        }
-                    }
-                }
-
-                if (isVisible)
-                {
-                    if (showmanual)
-                    {
-                        manualwindowPos = GUILayout.Window(555, manualwindowPos, manualGUI,
-                            "Protractor v." + version, GUILayout.Width(400), GUILayout.Height(500));
-                    }
-                    if (showsettings)
-                    {
-                        settingswindowPos = GUILayout.Window(557, settingswindowPos, settingsGUI,
-                            "Settings", GUILayout.Width(200), GUILayout.Height(100));
-                    }
-
-                    windowPos = GUILayout.Window(556, windowPos, mainGUI, "Protractor v." + version, GUILayout.Width(1), GUILayout.Height(1)); //367
-                }
-                else
-                {
-                    approach.enabled = false;
-                }
-            }
-        }
-
-        public override void OnStart(PartModule.StartState state)
-        {
-            base.OnStart(state);
-            if (state != StartState.Editor)
-            {
-                approach_obj = new GameObject("Line");
-                loadsettings();
-                if ((windowPos.x == 0) && (windowPos.y == 0))//windowPos is used to position the GUI window, lets set it in the center of the screen
-                {
-                    windowPos = new Rect(Screen.width / 2, Screen.height / 2, 10, 10);
-                }
-
-                approach_obj.layer = 9;
-                cam = (PlanetariumCamera)GameObject.FindObjectOfType(typeof(PlanetariumCamera));
-                
-                approach = approach_obj.AddComponent<LineRenderer>();
-                approach.transform.parent = null;
-                approach.enabled = false;
-                approach.SetColors(Color.green, Color.green);
-                approach.useWorldSpace = true;
-                approach.SetVertexCount(2);
-                approach.SetWidth(10, 10);  //was 15, 5
-
-                approach.material = ((MapView)GameObject.FindObjectOfType(typeof(MapView))).orbitLinesMaterial;
-
-                if (ToolbarManager.ToolbarAvailable)
-                {
-                    Debug.Log("Protractor: Blizzy's toolbar present");
-
-                    button = ToolbarManager.Instance.add("Protractor", "protractorButton");
-                    button.TexturePath = "Protractor/icon";
-                    button.ToolTip = "Toggle Protractor UI";
-                    button.Visibility = new GameScenesVisibility(GameScenes.FLIGHT);
-                    button.OnClick += (e) =>
-                    {
-                        isVisible = !isVisible;
-                    };
-                }
-                else
-                {
-                    Debug.Log("Protractor: Blizzy's toolbar NOT present");
-                    loadicons();
-                }
-                RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
-                vessel.OnFlyByWire += new FlightInputCallback(fly);
-            }
-        }
-
-        // If using Blizzy78's Toolbar, the button *must* be destroyed OnDestroy
-        public void OnDestroy()
-        {
-            if (button != null)
-            {
-                button.Destroy();
-            }
-        }
-
-        public void Update()
-        {
-            if (isVisible)
-            {
-                protractoricon = protractoriconON;
-            }
-            else
-            {
-                protractoricon = protractoriconOFF;
-            }
-        }
-
-        public override void OnSave(ConfigNode node)
-        {
-            savesettings();
-            base.OnSave(node);
-        }
-
-        public void FixedUpdate()
-        {
-            if (!HighLogic.LoadedSceneIsFlight)
-            {
-                return;
-            }
-            if (vessel.situation != Vessel.Situations.PRELAUNCH)
-            {
-                totaldv += TimeWarp.fixedDeltaTime * thrustAccel();
-                if (trackdv)
-                {
-                    trackeddv += TimeWarp.fixedDeltaTime * thrustAccel();
-                }
-            }
-            base.OnFixedUpdate();
-        }
-
         public void fly(FlightCtrlState s)
         {
             throttle = s.mainThrottle;
         }
 
+        /*
+         * SETTINGS.
+         */
         public void savesettings()
         {
             if (!loaded)
@@ -1185,6 +1192,9 @@ namespace Protractor {
             Debug.Log("-------------Loaded Protractor Settings-------------");
         }
 
+        /*
+         * Mathy stuff.
+         */
         public double getclosestapproach(CelestialBody target)
         {
             Orbit closestorbit = new Orbit();
