@@ -59,10 +59,12 @@ namespace Protractor {
         private bool
             phitotime = false,
             thetatotime = false,
+            dvtotime = false,
             adjustejectangle = false,
             showmanual = true,
             showsettings = false,
-            init = false,
+            isInitialized = false,
+            isGUIInitialized = false,
             loaded = false,
             showplanets = true,
             showadvanced = false,
@@ -99,7 +101,8 @@ namespace Protractor {
             phi_time,
             bodytip,
             phase_angle_time,
-            linetip;
+            linetip,
+            dv_time;
         private string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
         // The Id of the currently selected GUI skin
@@ -118,7 +121,7 @@ namespace Protractor {
         // Initializes lists of bodies, planets, and parameters
         private void initialize()
         {
-            if (init)
+            if (isInitialized)
             {
                 return;
             }
@@ -132,8 +135,29 @@ namespace Protractor {
 
             getorbitbodytype();
 
-            init = true;
+            isInitialized = true;
 
+            bodycolorlist.Add("Kerbin", Utils.hextorgb("a3ede4"));
+            bodycolorlist.Add("Moho", Utils.hextorgb("c46a4b"));
+            bodycolorlist.Add("Eve", Utils.hextorgb("d3adff"));
+            bodycolorlist.Add("Duna", Utils.hextorgb("edb4a6"));
+            bodycolorlist.Add("Jool", Utils.hextorgb("8cf068"));
+            bodycolorlist.Add("Vall", Utils.hextorgb("969ebf"));
+            bodycolorlist.Add("Laythe", Utils.hextorgb("90caeb"));
+            bodycolorlist.Add("Tylo", Utils.hextorgb("fedede"));
+            bodycolorlist.Add("Bop", Utils.hextorgb("b8a58b"));
+            bodycolorlist.Add("Ike", Utils.hextorgb("aeb5ca"));
+            bodycolorlist.Add("Gilly", Utils.hextorgb("b8a58b"));
+            bodycolorlist.Add("Mun", Utils.hextorgb("aeb5ca"));
+            bodycolorlist.Add("Minmus", Utils.hextorgb("a68db8"));
+            bodycolorlist.Add("Eeloo", Utils.hextorgb("929292"));
+            bodycolorlist.Add("Dres", Utils.hextorgb("917552"));
+            bodycolorlist.Add("Pol", Utils.hextorgb("929d6d"));
+            Debug.Log("-------------Protractor Initialized-------------");
+        }
+
+        private void initGUI()
+        {
             boldstyle = new GUIStyle(GUI.skin.label);
             boldstyle.normal.textColor = Color.yellow;
             boldstyle.fontStyle = FontStyle.Bold;
@@ -164,7 +188,7 @@ namespace Protractor {
             dataintercept = new GUIStyle(GUI.skin.label);
             dataintercept.alignment = TextAnchor.MiddleLeft;
             dataintercept.fontStyle = FontStyle.BoldAndItalic;
-            
+
             iconstyle = new GUIStyle();
 
             // Figure out the width of the fields in the GUI with a little font metrics
@@ -174,23 +198,7 @@ namespace Protractor {
                 colwidths[i] = Mathf.CeilToInt(datastyle.CalcSize(new GUIContent(colsamples[i])).x);
             }
 
-            bodycolorlist.Add("Kerbin", Utils.hextorgb("a3ede4"));
-            bodycolorlist.Add("Moho", Utils.hextorgb("c46a4b"));
-            bodycolorlist.Add("Eve", Utils.hextorgb("d3adff"));
-            bodycolorlist.Add("Duna", Utils.hextorgb("edb4a6"));
-            bodycolorlist.Add("Jool", Utils.hextorgb("8cf068"));
-            bodycolorlist.Add("Vall", Utils.hextorgb("969ebf"));
-            bodycolorlist.Add("Laythe", Utils.hextorgb("90caeb"));
-            bodycolorlist.Add("Tylo", Utils.hextorgb("fedede"));
-            bodycolorlist.Add("Bop", Utils.hextorgb("b8a58b"));
-            bodycolorlist.Add("Ike", Utils.hextorgb("aeb5ca"));
-            bodycolorlist.Add("Gilly", Utils.hextorgb("b8a58b"));
-            bodycolorlist.Add("Mun", Utils.hextorgb("aeb5ca"));
-            bodycolorlist.Add("Minmus", Utils.hextorgb("a68db8"));
-            bodycolorlist.Add("Eeloo", Utils.hextorgb("929292"));
-            bodycolorlist.Add("Dres", Utils.hextorgb("917552"));
-            bodycolorlist.Add("Pol", Utils.hextorgb("929d6d"));
-            Debug.Log("-------------Protractor Initialized-------------");
+            isGUIInitialized = true;
         }
 
         public void loadicons()
@@ -203,9 +211,14 @@ namespace Protractor {
         {
             primary = this;
 
-            if (!init)
+            if (!isInitialized)
             {
                 initialize();
+            }
+            if (!isGUIInitialized)
+            {
+                LoadSkin((SkinType)skinId);
+                initGUI();
             }
 
             foreach (Part p in vessel.parts)
@@ -267,6 +280,10 @@ namespace Protractor {
             base.OnStart(state);
             if (state != StartState.Editor)
             {
+                if (!isInitialized)
+                {
+                    initialize();
+                }
                 approach_obj = new GameObject("Line");
                 loadsettings();
                 if ((windowPos.x == 0) && (windowPos.y == 0))//windowPos is used to position the GUI window, lets set it in the center of the screen
@@ -356,11 +373,6 @@ namespace Protractor {
 
         public void mainGUI(int windowID)
         {
-            if (!init)
-            {
-                LoadSkin((SkinType)skinId);
-                initialize();
-            }
             if (vessel.mainBody != lastknownmainbody)
             {
                 drawApproachToBody = null;
@@ -374,7 +386,8 @@ namespace Protractor {
             bodytip = focusbody == null ? "Click to focus" : "Click to unfocus";
             linetip = "Click to toggle approach line";
             phase_angle_time = "Toggle between angle and ESTIMATED time";
-            phi_time = "Toggle between angle and ESTIMTED time";
+            phi_time = "Toggle between angle and ESTIMATED time";
+            dv_time = "Toggle between ΔV and ESTIMATED\nburn time at full thrust";
 
             printheaders();
             if (showplanets)
@@ -442,7 +455,13 @@ namespace Protractor {
                 "- Click on the number in \"Closest\" column to toggle the closest approach line on the map\n" +
                 "- Click on the name of a celestial body in the list to hide other bodies.\n" +
                 "- Click on θ in the column headers to toggle between displaying an angle and an \n" +
-                " approximate time until the next launch window in the format D.HH:MM.\n" +
+                " approximate time until the next launch window.\n" +
+                "- Click on Ψ in the column headers to toggle between displaying and angle and an\n" +
+                " approximate time until the next ejection burn.\n" +
+                "- Click on Δv in the column headers to toggle between displaying estimated transfer\n" +
+                " delta V and an approximate burn time for that delta V in seconds. When engines are\n" +
+                " off, uses maximum thrust for current stage. When firing engines, uses the thrust at\n" +
+                " current throttle levels.\n" +
                 "- When a body is focused and an intercept is detected, your predicted inclination is \n" +
                 " displayed below the closest approach.\n\n" +
                 "*****Column Key*****\n\n" +
@@ -492,7 +511,7 @@ namespace Protractor {
             // In interstellar space
             if (vessel.mainBody == Planetarium.fetch.Sun)
             {
-                if (init)
+                if (isInitialized)
                 {
                     moons.Clear();
                 }
@@ -603,6 +622,15 @@ namespace Protractor {
                             {
                                 phitotime = !phitotime;
                             }
+                        }
+                        else if (colheaders[i] == "Δv")
+                        {
+                            GUILayout.Label(new GUIContent(colheaders[i], dv_time), boldstyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
+                            {
+                                dvtotime = !dvtotime;
+                            }
+                            
                         }
                         else
                         {
@@ -769,10 +797,23 @@ namespace Protractor {
                         }
                         else
                         {
-                            GUILayout.Label(String.Format("{0:0.0} m/s", CalculateDeltaV(planet)), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            double dv = CalculateDeltaV(planet);
+                            if (!dvtotime)
+                            {
+                                GUILayout.Label(String.Format("{0:0.0} m/s", dv), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            }
+                            else
+                            {
+                                double thrust = calcThrust();
+                                if (vessel.ctrlState.mainThrottle != 0)
+                                {
+                                    thrust *= vessel.ctrlState.mainThrottle;
+                                }
+                                GUILayout.Label(calcBurnTime(dv, vessel.GetTotalMass(), thrust).ToString("F1") + "s", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            }
                         }
                         break;
-                    //******closest******
+                        //******closest approach******
                     case 4:
                         double distance = getclosestapproach(planet);
                         GUIStyle diststyle = datastyle;
@@ -850,7 +891,7 @@ namespace Protractor {
                             }
                         }
                         break;
-                    //******printing phase angles******
+                    //******phase angles******
                     case 1:
                         double data = (CurrentPhase(moon) - DesiredPhase(moon) + 360) % 360;
                         string datastring;
@@ -896,7 +937,7 @@ namespace Protractor {
                         GUI.skin.label.alignment = TextAnchor.MiddleLeft;
                         
                         break;
-                    //******printing eject angleS******
+                    //******eject angles******
                     case 2:
                         if (orbiting == orbitbodytype.planet) //vessel and moon share planet
                         {
@@ -937,10 +978,25 @@ namespace Protractor {
                             GUILayout.Label(phidisplay, datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         break;
+                        //******delta V******
                     case 3:
-                        GUILayout.Label(String.Format("{0:0.0} m/s", CalculateDeltaV(moon)), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                        double dv = CalculateDeltaV(moon);
+                        if (!dvtotime)
+                        {
+                            GUILayout.Label(String.Format("{0:0.0} m/s", dv), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                        }
+                        else
+                        {
+                            double thrust = calcThrust();
+                            if (vessel.ctrlState.mainThrottle != 0)
+                            {
+                                thrust *= vessel.ctrlState.mainThrottle;
+                            }
+                            GUILayout.Label(calcBurnTime(dv, vessel.GetTotalMass(), thrust).ToString("F1") + "s", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                        }
                         break;
                     case 4:
+                        //******closest approach distance******
                         double distance = getclosestapproach(moon);
                         GUIStyle diststyle = datastyle;
                         if (distance <= 2 * moon.sphereOfInfluence && distance >= 0)
@@ -1106,23 +1162,32 @@ namespace Protractor {
         {
             if (drawApproachToBody != null && MapView.MapIsEnabled && closestApproachTime > 0)
             {
-                approach.enabled = true;
+                //approach.enabled = true;
                 Orbit closeorbit = getclosestorbit(drawApproachToBody);
 
-                if (closeorbit.referenceBody == drawApproachToBody)
+                double distance = getclosestapproach(drawApproachToBody);
+                // Only draw when not on intercept course already. Was a bug where
+                // we would draw a line to nowhere when intercepting. This is better.
+                if (distance > drawApproachToBody.sphereOfInfluence)
                 {
-                    approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getTruePositionAtUT(closestApproachTime)));
+                    approach.enabled = true;
+                    if (closeorbit.referenceBody == drawApproachToBody)
+                    {
+                        approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getTruePositionAtUT(closestApproachTime)));
+                    } else
+                    {
+                        approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getPositionAtUT(closestApproachTime)));
+                    }
+
+                    approach.SetPosition(1, ScaledSpace.LocalToScaledSpace(drawApproachToBody.orbit.getPositionAtUT(closestApproachTime)));
+
+                    float scale = (float)(0.004 * cam.Distance);
+                    approach.SetWidth(scale, scale);
                 }
                 else
                 {
-                    approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getPositionAtUT(closestApproachTime)));
+                    approach.enabled = false;
                 }
-
-                approach.SetPosition(1, ScaledSpace.LocalToScaledSpace(drawApproachToBody.orbit.getPositionAtUT(closestApproachTime)));
-
-
-                float scale = (float)(0.004 * cam.Distance);
-                approach.SetWidth(scale, scale);
             }
             else
             {
@@ -1557,6 +1622,52 @@ namespace Protractor {
 
             return thrustmax / totalmass;
         }
+
+        // TODO: Account for thrust vector that is offset from CoM
+        double calcBurnTime(double deltaV, double initialMass, double thrust)
+        {
+            return initialMass * deltaV / thrust;
+        }
+
+        double calcThrust()
+        {
+            double totalThrust = 0.0;
+            Vessel vessel = FlightGlobals.fetch.activeVessel;
+
+            foreach (Part part in vessel.parts)
+            {
+                if (part.Modules.Contains("ModuleEngines"))
+                {
+                    foreach (PartModule module in part.Modules)
+                    {
+                        if (module is ModuleEngines && module.isEnabled)
+                        {
+                            ModuleEngines engine = (ModuleEngines)module;
+                            if (!engine.getFlameoutState)
+                            {
+                                totalThrust += engine.maxThrust;
+                            }
+                        }
+                    }
+                }
+                else if (part.Modules.Contains("ModuleEnginesFX"))
+                {
+                    foreach (PartModule module in part.Modules)
+                    {
+                        if (module is ModuleEnginesFX && module.isEnabled)
+                        {
+                            ModuleEnginesFX engine = (ModuleEnginesFX)module;
+                            if (!engine.getFlameoutState)
+                            {
+                                totalThrust += engine.maxThrust;
+                            }
+                        }
+                    }
+                }
+            }
+            return totalThrust;
+        }
+
         /*
         public string toSI(double d)
         {
