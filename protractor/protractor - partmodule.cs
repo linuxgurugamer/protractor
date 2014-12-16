@@ -1556,34 +1556,7 @@ namespace Protractor {
                 }
                 if ((p.State == PartStates.ACTIVE) || (Staging.CurrentStage > Staging.lastStage && p.inverseStage == Staging.lastStage))
                 {
-                    if (p is LiquidEngine && p.RequestFuel(p, 0, Part.getFuelReqId()))
-                    {
-                        LiquidEngine le = (LiquidEngine)p;
-                        double amountforward = Vector3d.Dot(le.transform.rotation * le.thrustVector.normalized, forward);
-                        thrustmax += le.maxThrust * amountforward;
-                        thrustmin += (le.minThrust * amountforward);
-                    }
-                    else if (p is LiquidFuelEngine && p.RequestFuel(p, 0, Part.getFuelReqId()))
-                    {
-                        LiquidFuelEngine lfe = (LiquidFuelEngine)p;
-                        double amountforward = Vector3d.Dot(lfe.transform.rotation * lfe.thrustVector.normalized, forward);
-                        thrustmax += lfe.maxThrust * amountforward;
-                        thrustmin += (lfe.minThrust * amountforward);
-                    }
-                    else if (p is SolidRocket && !p.ActivatesEvenIfDisconnected)
-                    {
-                        SolidRocket sr = (SolidRocket)p;
-                        double amountforward = Vector3d.Dot(sr.transform.rotation * sr.thrustVector.normalized, forward);
-                        thrustmax += sr.thrust * amountforward;
-                        thrustmin += (sr.thrust * amountforward);
-                    }
-                    else if (p is AtmosphericEngine && p.RequestFuel(p, 0, Part.getFuelReqId()))
-                    {
-                        AtmosphericEngine ae = (AtmosphericEngine)p;
-                        double amountforward = Vector3d.Dot(ae.transform.rotation * ae.thrustVector.normalized, forward);
-                        thrustmax += (ae.maximumEnginePower * ae.totalEfficiency * amountforward);
-                    }
-                    else if (p.Modules.Contains("ModuleEngines"))
+                    if (p.Modules.Contains("ModuleEngines"))
                     {
                         foreach (PartModule pm in p.Modules)
                         {
