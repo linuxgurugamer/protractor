@@ -116,7 +116,7 @@ namespace Protractor {
         public static bool isVisible = true;
 
         // Button for Toolbar
-        private IButton button;
+        private IButton button = null;
 
         // Initializes lists of bodies, planets, and parameters
         private void initialize()
@@ -220,6 +220,9 @@ namespace Protractor {
                 LoadSkin((SkinType)skinId);
                 initGUI();
             }
+            // OnDestroy gets called for us when another ship with Protractor exits physics range.
+            // So we constantly need to recheck and put it back if it's been zapped.
+            CreateToolbarButton();
 
             foreach (Part p in vessel.parts)
             {
@@ -307,7 +310,25 @@ namespace Protractor {
                 if (ToolbarManager.ToolbarAvailable)
                 {
                     Debug.Log("Protractor: Blizzy's toolbar present");
+                    CreateToolbarButton();
+                }
+                else
+                {
+                    Debug.Log("Protractor: Blizzy's toolbar NOT present");
+                    loadicons();
+                }
 
+                RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
+                vessel.OnFlyByWire += new FlightInputCallback(fly);
+            }
+        }
+
+        private void CreateToolbarButton()
+        {
+            if (ToolbarManager.ToolbarAvailable)
+            {
+                if (button == null)
+                {
                     button = ToolbarManager.Instance.add("Protractor", "protractorButton");
                     button.TexturePath = "Protractor/icon";
                     button.ToolTip = "Toggle Protractor UI";
@@ -317,13 +338,6 @@ namespace Protractor {
                         isVisible = !isVisible;
                     };
                 }
-                else
-                {
-                    Debug.Log("Protractor: Blizzy's toolbar NOT present");
-                    loadicons();
-                }
-                RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
-                vessel.OnFlyByWire += new FlightInputCallback(fly);
             }
         }
 
@@ -333,6 +347,7 @@ namespace Protractor {
             if (button != null)
             {
                 button.Destroy();
+                button = null;
             }
         }
 
