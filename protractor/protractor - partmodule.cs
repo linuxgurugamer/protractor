@@ -1134,7 +1134,7 @@ namespace Protractor {
                     GUILayout.BeginVertical();
                     {
                         GUILayout.Label("Alt above " + vessel.mainBody.orbit.referenceBody.name + ": " +
-                            ToSI(1.05 * vessel.mainBody.orbit.referenceBody.maxAtmosphereAltitude) + "m", boldstyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            ToSI(1.05 * vessel.mainBody.orbit.referenceBody.atmosphereDepth) + "m", boldstyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                     }
                     GUILayout.EndVertical();
                 }
@@ -1449,7 +1449,7 @@ namespace Protractor {
             double moonalt = calcmeanalt(moon);
             double usun = dest.referenceBody.gravParameter;
             double uplanet = planet.gravParameter;
-            double oberthalt = (planet.Radius + planet.maxAtmosphereAltitude) * 1.05;
+            double oberthalt = (planet.Radius + planet.atmosphereDepth) * 1.05;
 
             double th1 = Math.PI * Math.Sqrt(Math.Pow(moonalt + oberthalt, 3) / (8 * uplanet));
             double th2 = Math.PI * Math.Sqrt(Math.Pow(planetalt + destalt, 3) / (8 * usun));
@@ -1519,7 +1519,7 @@ namespace Protractor {
         {
             CelestialBody orig = vessel.mainBody;
             double o_alt = calcmeanalt(orig);
-            double d_alt = (vessel.mainBody.orbit.referenceBody.Radius + vessel.mainBody.orbit.referenceBody.maxAtmosphereAltitude) * 1.05;
+            double d_alt = (vessel.mainBody.orbit.referenceBody.Radius + vessel.mainBody.orbit.referenceBody.atmosphereDepth) * 1.05;
             double o_soi = orig.sphereOfInfluence;
             double o_radius = orig.Radius;
             double o_mu = orig.gravParameter;
@@ -1581,8 +1581,9 @@ namespace Protractor {
                                 //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
                                 if (!me.getFlameoutState)
                                 {
-                                    thrustmax += me.maxThrust;
-                                    thrustmin += me.minThrust;
+                                    double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
+                                    thrustmax += isp * me.maxFuelFlow;
+                                    thrustmin += isp * me.minFuelFlow;
                                 }
                             }
                         }
@@ -1597,8 +1598,9 @@ namespace Protractor {
                                 //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
                                 if (!me.getFlameoutState)
                                 {
-                                    thrustmax += me.maxThrust;
-                                    thrustmin += me.minThrust;
+                                    double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
+                                    thrustmax += isp * me.maxFuelFlow;
+                                    thrustmin += isp * me.minFuelFlow;
                                 }
                             }
                         }
@@ -1633,7 +1635,8 @@ namespace Protractor {
                             ModuleEngines engine = (ModuleEngines)module;
                             if (!engine.getFlameoutState)
                             {
-                                totalThrust += engine.maxThrust;
+                                double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
+                                totalThrust += isp * engine.maxFuelFlow;
                             }
                         }
                     }
@@ -1647,7 +1650,8 @@ namespace Protractor {
                             ModuleEnginesFX engine = (ModuleEnginesFX)module;
                             if (!engine.getFlameoutState)
                             {
-                                totalThrust += engine.maxThrust;
+                                double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
+                                totalThrust += isp * engine.maxFuelFlow;
                             }
                         }
                     }
