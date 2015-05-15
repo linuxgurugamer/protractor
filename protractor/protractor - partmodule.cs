@@ -1575,15 +1575,17 @@ namespace Protractor {
                     {
                         foreach (PartModule pm in p.Modules)
                         {
-                            if (pm is ModuleEngines && pm.isEnabled)
+                            if (pm != null && pm is ModuleEngines && pm.isActiveAndEnabled)
                             {
                                 ModuleEngines me = (ModuleEngines)pm;
                                 //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
-                                if (!me.getFlameoutState)
+                                if (me.isOperational && !me.getFlameoutState)
                                 {
                                     double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
-                                    thrustmax += isp * me.maxFuelFlow;
-                                    thrustmin += isp * me.minFuelFlow;
+                                    //thrustmax += isp * me.maxFuelFlow;
+                                    //thrustmin += isp * me.minFuelFlow;
+                                    thrustmax += me.maxThrust;
+                                    thrustmin += me.minThrust;
                                 }
                             }
                         }
@@ -1592,15 +1594,17 @@ namespace Protractor {
                     {
                         foreach (PartModule pm in p.Modules)
                         {
-                            if (pm is ModuleEnginesFX && pm.isEnabled)
+                            if (pm != null && pm is ModuleEnginesFX && pm.isActiveAndEnabled)
                             {
                                 ModuleEnginesFX me = (ModuleEnginesFX)pm;
                                 //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
-                                if (!me.getFlameoutState)
+                                if (me.isOperational && !me.getFlameoutState)
                                 {
                                     double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
-                                    thrustmax += isp * me.maxFuelFlow;
-                                    thrustmin += isp * me.minFuelFlow;
+                                    //thrustmax += isp * me.maxFuelFlow;
+                                    //thrustmin += isp * me.minFuelFlow;
+                                    thrustmax += me.maxThrust;
+                                    thrustmin += me.minThrust;
                                 }
                             }
                         }
@@ -1630,10 +1634,10 @@ namespace Protractor {
                 {
                     foreach (PartModule module in part.Modules)
                     {
-                        if (module is ModuleEngines && module.isEnabled)
+                        if (module != null && module is ModuleEngines && module.isActiveAndEnabled)
                         {
                             ModuleEngines engine = (ModuleEngines)module;
-                            if (!engine.getFlameoutState)
+                            if (engine.isOperational && !engine.getFlameoutState)
                             {
                                 double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
                                 totalThrust += isp * engine.maxFuelFlow;
@@ -1645,10 +1649,10 @@ namespace Protractor {
                 {
                     foreach (PartModule module in part.Modules)
                     {
-                        if (module is ModuleEnginesFX && module.isEnabled)
+                        if (module != null && module is ModuleEnginesFX && module.isActiveAndEnabled)
                         {
                             ModuleEnginesFX engine = (ModuleEnginesFX)module;
-                            if (!engine.getFlameoutState)
+                            if (engine.isOperational && !engine.getFlameoutState)
                             {
                                 double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
                                 totalThrust += isp * engine.maxFuelFlow;
