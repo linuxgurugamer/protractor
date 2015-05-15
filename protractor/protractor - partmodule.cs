@@ -1581,7 +1581,7 @@ namespace Protractor {
                                 //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
                                 if (me.isOperational && !me.getFlameoutState)
                                 {
-                                    double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
+                                    //double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
                                     //thrustmax += isp * me.maxFuelFlow;
                                     //thrustmin += isp * me.minFuelFlow;
                                     thrustmax += me.maxThrust;
@@ -1600,7 +1600,7 @@ namespace Protractor {
                                 //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
                                 if (me.isOperational && !me.getFlameoutState)
                                 {
-                                    double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
+                                    //double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
                                     //thrustmax += isp * me.maxFuelFlow;
                                     //thrustmin += isp * me.minFuelFlow;
                                     thrustmax += me.maxThrust;
@@ -1639,8 +1639,9 @@ namespace Protractor {
                             ModuleEngines engine = (ModuleEngines)module;
                             if (engine.isOperational && !engine.getFlameoutState)
                             {
-                                double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
-                                totalThrust += isp * engine.maxFuelFlow;
+                                //double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
+                                //totalThrust += isp * engine.maxFuelFlow;
+                                totalThrust += engine.maxThrust;
                             }
                         }
                     }
@@ -1654,8 +1655,9 @@ namespace Protractor {
                             ModuleEnginesFX engine = (ModuleEnginesFX)module;
                             if (engine.isOperational && !engine.getFlameoutState)
                             {
-                                double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
-                                totalThrust += isp * engine.maxFuelFlow;
+                                //double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
+                                //totalThrust += isp * engine.maxFuelFlow;
+                                totalThrust += engine.maxThrust;
                             }
                         }
                     }
