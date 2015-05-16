@@ -42,12 +42,9 @@ namespace Protractor {
             protractoriconON = new Texture2D(32, 32, TextureFormat.ARGB32, false),
             protractoricon = new Texture2D(30, 30, TextureFormat.ARGB32, false);
         private Dictionary<string, Color> bodycolorlist = new Dictionary<string, Color>();
-        private List<CelestialBody>
-            planets,
-            moons,
-            bodyList;
+        private ProtractorData pdata;
+        private ProtractorCalcs pcalcs;
         private CelestialBody
-            Sun = null,
             drawApproachToBody = null,
             focusbody = null,
             lastknownmainbody;
@@ -57,7 +54,7 @@ namespace Protractor {
             windowPos;
         private Vector2 scrollposition;
         private bool
-            phitotime = false,
+            psitotime = false,
             thetatotime = false,
             dvtotime = false,
             adjustejectangle = false,
@@ -85,20 +82,19 @@ namespace Protractor {
         private double
             throttle = 0,
             totaldv = 0,
-            maxthrustaccel = 0,
-            minthrustaccel = 0,
-            trackeddv = 0,
-            closestApproachTime = -1;
-        private enum orbitbodytype { sun, planet, moon };
+            trackeddv = 0;
+            //closestApproachTime = -1;
+
+        public float t_lastUpdate = 0.0f;
 
         // Sample strings for GUI fields for font metrics
         private string[] colheaders = new string[6] { "", "θ", "Ψ", "Δv", "Closest", "Moon Ω" };
         private string[] colsamples = new string[6] { "XXXXXXXX", "Xy XXXd 00:00:00XX", "00:00:00XX", "0000.0 m/sXX", "000.00 XXXX", "Moon Ω" };
         private int[] colwidths = new int[6] { 70, 120, 63, 71, 100, 71 };
 
-        private ProtractorModule.orbitbodytype orbiting;
+        //private ProtractorModule.orbitbodytype orbiting;
         private string
-            phi_time,
+            psi_time,
             bodytip,
             phase_angle_time,
             linetip,
@@ -111,6 +107,9 @@ namespace Protractor {
         public enum SkinType { Default, KSP, Compact }
         public static GUISkin defaultSkin;
         public static GUISkin compactSkin;
+
+        public float updateInterval = 1.0f;
+        public string updateIntervalString = "1.0";
 
         // Main GUI visibility
         public static bool isVisible = true;
@@ -127,13 +126,10 @@ namespace Protractor {
             }
             loadsettings();
  
-            Sun = Planetarium.fetch.Sun;
-            getbodies();
-            getplanets();
-            getmoons();
-            lastknownmainbody = vessel.mainBody;
+            pdata = new ProtractorData(vessel);
+            pcalcs = new ProtractorCalcs(pdata);
 
-            getorbitbodytype();
+            lastknownmainbody = vessel.mainBody;
 
             isInitialized = true;
 
@@ -377,12 +373,21 @@ namespace Protractor {
             }
             if (vessel.situation != Vessel.Situations.PRELAUNCH)
             {
-                totaldv += TimeWarp.fixedDeltaTime * thrustAccel();
+                totaldv += TimeWarp.fixedDeltaTime * pcalcs.thrustAccel();
                 if (trackdv)
                 {
-                    trackeddv += TimeWarp.fixedDeltaTime * thrustAccel();
+                    trackeddv += TimeWarp.fixedDeltaTime * pcalcs.thrustAccel();
                 }
             }
+
+            // Only recalculate data at fixed intervals (very roughly speaking)
+            t_lastUpdate += Time.deltaTime;
+            if (t_lastUpdate > updateInterval)
+            {
+                t_lastUpdate = 0.0f;
+                pcalcs.update(pdata.celestials);
+            }
+
             base.OnFixedUpdate();
         }
 
@@ -391,27 +396,30 @@ namespace Protractor {
             if (vessel.mainBody != lastknownmainbody)
             {
                 drawApproachToBody = null;
-                getmoons();
-                getplanets();
+                //getmoons();
+                //getplanets();
+                pdata.initialize(vessel);
                 lastknownmainbody = vessel.mainBody;
                 focusbody = null;
-                getorbitbodytype();
+                //getorbitbodytype();
             } //resets bodies, lines and collapse
 
             bodytip = focusbody == null ? "Click to focus" : "Click to unfocus";
             linetip = "Click to toggle approach line";
             phase_angle_time = "Toggle between angle and ESTIMATED time";
-            phi_time = "Toggle between angle and ESTIMATED time";
+            psi_time = "Toggle between angle and ESTIMATED time";
             dv_time = "Toggle between ΔV and ESTIMATED\nburn time at full thrust";
+
+            //pcalcs.update(pdata.celestials);
 
             printheaders();
             if (showplanets)
             {
-                printplanetdata ();
+                printplanetdata();
             }
             if (showmoons)
             {
-                printmoondata ();
+                printmoondata();
             }
             printvesseldata();
             drawApproach();
@@ -427,6 +435,22 @@ namespace Protractor {
 
         public void settingsGUI(int windowID)
         {
+            GUILayout.BeginVertical();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Update interval (secs): ");
+
+            updateIntervalString = GUILayout.TextField(updateIntervalString, 10);
+            try {
+                updateInterval = float.Parse(updateIntervalString);
+            } catch (Exception e) {
+                updateInterval = 1.0f;
+            }
+            if (updateInterval < 0.001f || updateInterval > 10.0f)
+            {
+                updateInterval = 1.0f;
+            }
+            GUILayout.EndHorizontal();
+
             GUILayout.Label("Current skin: " + (SkinType)skinId );
             if (GUI.skin == null || skinId != 1)
             {
@@ -452,6 +476,7 @@ namespace Protractor {
                     skinId = 2;
                 }
             }
+            GUILayout.EndVertical();
             GUI.DragWindow();
         }
 
@@ -520,80 +545,7 @@ namespace Protractor {
             GUILayout.EndScrollView();
             GUI.DragWindow();
         }
-
-        public void getmoons()  //gets a list of moons
-        {
-            // In interstellar space
-            if (vessel.mainBody == Planetarium.fetch.Sun)
-            {
-                if (isInitialized)
-                {
-                    moons.Clear();
-                }
-                else
-                {
-                    moons = new List<CelestialBody>();
-                }
-            }
-            // Orbiting a planet
-            else if (vessel.mainBody.referenceBody == Planetarium.fetch.Sun)
-            {
-                moons = new List<CelestialBody>(vessel.mainBody.orbitingBodies);
-            }
-            // Orbiting a moon, gets all moons in planetary system
-            else
-            {
-                moons = new List<CelestialBody>();
-                List<CelestialBody> allmoons = new List<CelestialBody>(vessel.mainBody.referenceBody.orbitingBodies);
-                foreach (CelestialBody moon in allmoons)
-                {
-                    if (vessel.mainBody != moon)
-                    {
-                        moons.Add(moon);
-                    }
-                }
-            }
-        }
-
-        // Gets a list of celestial bodies orbiting the star
-        public void getplanets()
-        {
-            planets = new List<CelestialBody>();
-            foreach (CelestialBody body in bodyList)
-            {
-                if (body.referenceBody == Planetarium.fetch.Sun)
-                {
-                    if (body == Planetarium.fetch.Sun || body == vessel.mainBody || body == vessel.mainBody.referenceBody)
-                    {
-                        continue;
-                    }
-                    planets.Add(body);
-                }
-            }
-        }
-
-        // Gets a list of all celestial bodies in the system
-        public void getbodies()
-        {
-            bodyList = new List<CelestialBody>(FlightGlobals.Bodies);
-        }
-
-        public void getorbitbodytype()
-        {
-            if (vessel.mainBody == Planetarium.fetch.Sun)
-            {
-                orbiting = orbitbodytype.sun;
-            }
-            else if (vessel.mainBody.referenceBody != Planetarium.fetch.Sun)
-            {
-                orbiting = orbitbodytype.moon;
-            }
-            else
-            {
-                orbiting = orbitbodytype.planet;
-            }
-        }
-
+      
         public void switchcolor(string key)
         {
             Color col;
@@ -616,7 +568,7 @@ namespace Protractor {
             {
                 for (int i = 0; i <= 5; i++)
                 {
-                    if (i == 5 && (!showadvanced || orbiting != orbitbodytype.moon))
+                    if (i == 5 && (!showadvanced || pdata.getorbitbodytype() != ProtractorData.orbitbodytype.moon))
                     {
                         continue;
                     }
@@ -632,10 +584,10 @@ namespace Protractor {
                         }
                         else if (colheaders[i] == "Ψ")
                         {
-                            GUILayout.Label(new GUIContent(colheaders[i], phi_time), boldstyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label(new GUIContent(colheaders[i], psi_time), boldstyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                             if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
                             {
-                                phitotime = !phitotime;
+                                psitotime = !psitotime;
                             }
                         }
                         else if (colheaders[i] == "Δv")
@@ -661,8 +613,9 @@ namespace Protractor {
 
         public void printplanetdata()
         {
-            foreach (CelestialBody planet in planets)
+            foreach (CelestialBody planet in pdata.planets)
             {
+                CelestialData planetdata = pdata.celestials[planet.name];
                 if (!(planet.Equals(focusbody)) && (focusbody != null))
                 {
                     continue; //focus body defined and it isn't this one
@@ -677,7 +630,7 @@ namespace Protractor {
                     {
                     //******printing names******
                     case 0:
-                        GUILayout.Label(new GUIContent(planet.name, bodytip), datatitle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                        GUILayout.Label(new GUIContent(planetdata.name, bodytip), datatitle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
                         if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
                         {
@@ -693,48 +646,14 @@ namespace Protractor {
                         break;
                     //******printing phase angles******
                     case 1:
-                        double data;
                         string datastring;
-                        if (orbiting == orbitbodytype.moon) //get the data
-                        {
-                            data = (CurrentPhase(planet) - OberthDesiredPhase(planet) + 360) % 360;
-                        }
-                        else
-                        {
-                            data = (CurrentPhase(planet) - DesiredPhase(planet) + 360) % 360;
-                        }
-
                         if (thetatotime)    //convert to time or leave as angle
                         {
-                            double delta_theta;
-                            if (orbiting == orbitbodytype.moon)
-                            {
-                                CelestialBody o = vessel.orbit.referenceBody.orbit.referenceBody;
-                                delta_theta = (360 / o.orbit.period) - (360 / planet.orbit.period);
-                            }
-                            else if (orbiting == orbitbodytype.planet)
-                            {
-                                CelestialBody o = vessel.orbit.referenceBody;
-                                delta_theta = (360 / o.orbit.period) - (360 / planet.orbit.period);
-                            }
-                            else
-                            {
-                                delta_theta = (360 / vessel.orbit.period) - (360 / planet.orbit.period);
-                            }
-                            
-                            if (delta_theta > 0)
-                            {
-                                data /= delta_theta;
-                            }
-                            else
-                            {
-                                data = Math.Abs((360 - data) / (delta_theta));
-                            }
-                            datastring = TimeToDHMS(data);
+                            datastring = planetdata.theta_time;
                         }
                         else
                         {
-                            datastring = String.Format("{0:0.00}°", data);
+                            datastring = String.Format("{0:0.00}°", planetdata.theta_angle);
                         }
 
                         GUI.skin.label.alignment = TextAnchor.MiddleRight;
@@ -765,89 +684,79 @@ namespace Protractor {
 
                         //}
 
-                        if (orbiting != orbitbodytype.planet)
+                        if (pdata.getorbitbodytype() != ProtractorData.orbitbodytype.planet)
                         {
                             GUILayout.Label("----", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                        }
-                        else
-                        {
-                            double phidata;
-                            string phidisplay;
+                        } else {
+                            double psidata;
+                            string psidisplay;
 
-                            if (!adjustejectangle)
+                            if (adjustejectangle)
                             {
-                                phidata = (CalculateDesiredEjectionAngle(vessel.mainBody, planet) - CurrentEjectAngle(null) + 360) % 360;
-                            }
-                            else if (adjustejectangle && tmr() > 0)
-                            {
-                                phidata = (AdjustEjectAngle(vessel.mainBody, planet) - CurrentEjectAngle(null) + 360) % 360;
-                            }
-                            else
-                            {
-                                phidata = -1;
+                                psidata = planetdata.psi_angle_adjusted;
+                            } else {
+                                psidata = planetdata.psi_angle;
                             }
 
-                            if (phidata == -1)
+                            if (psidata == -1)
                             {
-                                phidisplay = "0 TMR";
-                            }
-                            else if (phitotime)
-                            {
-                                phidata /= (360 / vessel.orbit.period);
-                                phidisplay = TimeToDHMS(phidata);
-                            }
-                            else
-                            {
-                                phidisplay = String.Format("{0:0.00}°", phidata);
+                                psidisplay = "0 TMR";
+                            } else if (psitotime) {
+                                if (adjustejectangle)
+                                {
+                                    psidisplay = planetdata.psi_time_adjusted;
+                                } else {
+                                    psidisplay = planetdata.psi_time;
+                                }
+                            } else {
+                                psidisplay = String.Format("{0:0.00}°", psidata);
                             }
 
-                            GUILayout.Label(phidisplay, datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label(psidisplay, datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         break;
                     //******delta-v******
                     case 3:
-                        if (orbiting == orbitbodytype.moon)
+                        if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon)
                         {
                             GUILayout.Label("----", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         else
                         {
-                            double dv = CalculateDeltaV(planet);
+                            double dv = planetdata.deltaV;
                             if (!dvtotime)
                             {
                                 GUILayout.Label(String.Format("{0:0.0} m/s", dv), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                             }
                             else
                             {
-                                double thrust = calcThrust();
-                                if (vessel.ctrlState.mainThrottle != 0)
-                                {
-                                    thrust *= vessel.ctrlState.mainThrottle;
-                                }
-                                GUILayout.Label(calcBurnTime(dv, vessel.GetTotalMass(), thrust).ToString("F1") + "s", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                                GUILayout.Label(planetdata.deltaV_time.ToString("F1") + "s", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                             }
                         }
                         break;
                         //******closest approach******
                     case 4:
-                        double distance = getclosestapproach(planet);
+                        double distance = planetdata.closest_approach;
                         GUIStyle diststyle = datastyle;
                         if (distance <= 5 * planet.sphereOfInfluence && distance >= 0)
                         {
                             diststyle = dataclose;
                         }
+
                         if (distance <= planet.sphereOfInfluence && distance >= 0)
                         {
                             diststyle = dataintercept;
                         }
+
                         if (planet.Equals(drawApproachToBody))
                         {
-                            GUILayout.Label(new GUIContent("*" + ToSI(distance) + "m" + "*", linetip), diststyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label(new GUIContent("*" + ProtractorCalcs.ToSI(distance) + "m" + "*", linetip), diststyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         else
                         {
-                            GUILayout.Label(new GUIContent(ToSI(distance) + "m", linetip), diststyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label(new GUIContent(ProtractorCalcs.ToSI(distance) + "m", linetip), diststyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
+
                         if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
                         {
                             if (planet.Equals(drawApproachToBody))
@@ -861,9 +770,9 @@ namespace Protractor {
                         }
                         break;
                     case 5:
-                        if (orbiting == orbitbodytype.moon && showadvanced)
+                        if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon && showadvanced)
                         {
-                            GUILayout.Label(String.Format("{0:0.00}°", (CalculateDesiredEjectionAngle(vessel.mainBody.orbit.referenceBody, planet) + 180 - CurrentEjectAngle(vessel.mainBody) + 360) % 360), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label(String.Format("{0:0.00}°", planetdata.adv_ejection_angle), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         break;
                     }
@@ -873,10 +782,12 @@ namespace Protractor {
             }
         }
 
+
         public void printmoondata()
         {
-            foreach (CelestialBody moon in moons)
+            foreach (CelestialBody moon in pdata.moons)
             {
+                CelestialData moondata = pdata.celestials[moon.name];
                 if (!(moon.Equals (focusbody)) && (focusbody != null))
                 {
                     continue;
@@ -891,7 +802,7 @@ namespace Protractor {
                     {
                     //******printing names******
                     case 0:
-                        GUILayout.Label(new GUIContent(moon.name, bodytip), datatitle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                        GUILayout.Label(new GUIContent(moondata.name, bodytip), datatitle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         if ((Event.current.type == EventType.repaint) &&
                              GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) &&
                              Input.GetMouseButtonDown(0))
@@ -908,45 +819,16 @@ namespace Protractor {
                         break;
                     //******phase angles******
                     case 1:
-                        double data = (CurrentPhase(moon) - DesiredPhase(moon) + 360) % 360;
                         string datastring;
-                        if (thetatotime)
+                        if (thetatotime)    //convert to time or leave as angle
                         {
-                            double delta_theta;
-                            if (vessel.Landed && orbiting == orbitbodytype.planet)  //ship is landed on a planet, use rotation of the planet
-                            {
-                                //double ves_vel = vessel.horizontalSrfSpeed;
-                                double ves_vel = vessel.orbit.getOrbitalSpeedAtPos(vessel.CoM);
-                                double radius = vessel.altitude + vessel.mainBody.Radius;
-                                double circumference = Math.PI * 2 * radius;
-                                double rot = circumference / ves_vel;
-                                delta_theta = (360 / rot)-(360 / moon.orbit.period);
-                            }
-                            else if (orbiting == orbitbodytype.planet)   //ship orbiting a planet, but is not landed
-                            {
-                                delta_theta = (360 / vessel.orbit.period) - (360 / moon.orbit.period);
-                            }
-                            else     //ship orbiting a moon
-                            {
-                                CelestialBody o = vessel.mainBody;
-                                delta_theta = (360 / o.orbit.period) - (360 / moon.orbit.period);
-                            }
-                            
-                            //double delta_theta = (360 / vessel.orbit.referenceBody.orbit.period) - (360 / moon.orbit.period);   //FIX THIS - COMPARE ROTATION OF PLANET TO MOON OR USE TWO PLANET MODEL FOR TWO MOONS
-                            if (delta_theta > 0)
-                            {
-                                data/= delta_theta;
-                            }
-                            else
-                            {
-                                data = Math.Abs((360 - data) / (delta_theta));
-                            }
-                            datastring = TimeToDHMS(data);
+                            datastring = moondata.theta_time;
                         }
                         else
                         {
-                            datastring = String.Format("{0:0.00}°", data);
+                            datastring = String.Format("{0:0.00}°", moondata.theta_angle);
                         }
+
                         GUI.skin.label.alignment = TextAnchor.MiddleRight;
                         GUILayout.Label(datastring, datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         GUI.skin.label.alignment = TextAnchor.MiddleLeft;
@@ -954,66 +836,60 @@ namespace Protractor {
                         break;
                     //******eject angles******
                     case 2:
-                        if (orbiting == orbitbodytype.planet) //vessel and moon share planet
+                        if (pdata.getorbitbodytype() != ProtractorData.orbitbodytype.planet)
                         {
                             GUILayout.Label("----", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                        }
-                        else //vessel orbiting moon
-                        {
-                            double phidata;
-                            string phidisplay;
+                        } else {
+                            double psidata;
+                            string psidisplay;
 
-                            if (!adjustejectangle)
+                            if (adjustejectangle)
                             {
-                                phidata = (CalculateDesiredEjectionAngle(vessel.mainBody, moon) - CurrentEjectAngle(null) + 360) % 360;
-                            }
-                            else if (adjustejectangle && tmr() > 0)
-                            {
-                                phidata = (AdjustEjectAngle(vessel.mainBody, moon) - CurrentEjectAngle(null) + 360) % 360;
-                            }
-                            else
-                            {
-                                phidata = -1;
+                                psidata = moondata.psi_angle_adjusted;
+                            } else {
+                                psidata = moondata.psi_angle;
                             }
 
-                            if(phidata == -1)
+                            if (psidata == -1)
                             {
-                                phidisplay = "0 TMR";
+                                psidisplay = "0 TMR";
+                            } else if (psitotime) {
+                                if (adjustejectangle)
+                                {
+                                    psidisplay = moondata.psi_time_adjusted;
+                                } else {
+                                    psidisplay = moondata.psi_time;
+                                }
+                            } else {
+                                psidisplay = String.Format("{0:0.00}°", psidata);
                             }
-                            else if (phitotime)
-                            {
-                                phidata /= (360/vessel.orbit.period);
-                                phidisplay = TimeToDHMS(phidata);
-                            }
-                            else
-                            {
-                                phidisplay = String.Format("{0:0.00}°", phidata);
-                            }
-                            
-                            GUILayout.Label(phidisplay, datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+
+                            GUILayout.Label(psidisplay, datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         break;
                         //******delta V******
                     case 3:
-                        double dv = CalculateDeltaV(moon);
-                        if (!dvtotime)
+                        if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon)
                         {
-                            GUILayout.Label(String.Format("{0:0.0} m/s", dv), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label("----", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         else
                         {
-                            double thrust = calcThrust();
-                            if (vessel.ctrlState.mainThrottle != 0)
+                            double dv = moondata.deltaV;
+                            if (!dvtotime)
                             {
-                                thrust *= vessel.ctrlState.mainThrottle;
+                                GUILayout.Label(String.Format("{0:0.0} m/s", dv), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                             }
-                            GUILayout.Label(calcBurnTime(dv, vessel.GetTotalMass(), thrust).ToString("F1") + "s", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            else
+                            {
+                                GUILayout.Label(moondata.deltaV_time.ToString("F1") + "s", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            }
                         }
                         break;
                     case 4:
-                        //******closest approach distance******
-                        double distance = getclosestapproach(moon);
+                        double distance = moondata.closest_approach;
                         GUIStyle diststyle = datastyle;
+
                         if (distance <= 2 * moon.sphereOfInfluence && distance >= 0)
                         {
                             diststyle = dataclose;
@@ -1022,13 +898,14 @@ namespace Protractor {
                         {
                             diststyle = dataintercept;
                         }
+
                         if (moon.Equals(drawApproachToBody))
                         {
-                            GUILayout.Label(new GUIContent("*" + ToSI(distance) + "m" + "*", linetip), diststyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label(new GUIContent("*" + ProtractorCalcs.ToSI(distance) + "m" + "*", linetip), diststyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         else
                         {
-                            GUILayout.Label(new GUIContent(ToSI(distance) + "m", linetip), diststyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label(new GUIContent(ProtractorCalcs.ToSI(distance) + "m", linetip), diststyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
 
                         if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
@@ -1079,7 +956,7 @@ namespace Protractor {
                 }
                 GUILayout.EndVertical();
 
-                if (orbiting == orbitbodytype.moon)
+                if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon)
                 {
                     GUILayout.BeginVertical(GUILayout.Width(50));
                     {
@@ -1090,9 +967,9 @@ namespace Protractor {
 
                 GUILayout.FlexibleSpace();
 
-                if (focusbody != null && getclosestapproach(focusbody) <= focusbody.sphereOfInfluence)
+                if (focusbody != null && pcalcs.getclosestapproach(focusbody) <= focusbody.sphereOfInfluence)
                 {
-                    Orbit o = getclosestorbit(focusbody);
+                    Orbit o = pcalcs.getclosestorbit(focusbody);
                     if (o.referenceBody == focusbody)
                     {
                         GUILayout.Label(String.Format("Inc: {0:0.00}°", o.inclination));
@@ -1120,13 +997,13 @@ namespace Protractor {
                 GUILayout.EndHorizontal();
             }
 
-            if (orbiting == orbitbodytype.moon && showadvanced)
+            if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon && showadvanced)
             {
                 GUILayout.BeginHorizontal(databox);
                 {
                     GUILayout.BeginVertical();
                     {
-                        GUILayout.Label(String.Format("Ejection from " + vessel.mainBody.name + ": {0:0.00}°", (MoonAngle() - CurrentEjectAngle(null) + 360) % 360),
+                        GUILayout.Label(String.Format("Ejection from " + vessel.mainBody.name + ": {0:0.00}°", (pcalcs.MoonAngle() - pcalcs.CurrentEjectAngle(null) + 360) % 360),
                             boldstyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                     }
                     GUILayout.EndVertical();
@@ -1134,7 +1011,7 @@ namespace Protractor {
                     GUILayout.BeginVertical();
                     {
                         GUILayout.Label("Alt above " + vessel.mainBody.orbit.referenceBody.name + ": " +
-                            ToSI(1.05 * vessel.mainBody.orbit.referenceBody.atmosphereDepth) + "m", boldstyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            ProtractorCalcs.ToSI(1.05 * vessel.mainBody.orbit.referenceBody.atmosphereDepth) + "m", boldstyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                     }
                     GUILayout.EndVertical();
                 }
@@ -1175,12 +1052,12 @@ namespace Protractor {
 
         public void drawApproach()
         {
-            if (drawApproachToBody != null && MapView.MapIsEnabled && closestApproachTime > 0)
+            if (drawApproachToBody != null && MapView.MapIsEnabled && pdata.closestApproachTime > 0)
             {
                 //approach.enabled = true;
-                Orbit closeorbit = getclosestorbit(drawApproachToBody);
+                Orbit closeorbit = pcalcs.getclosestorbit(drawApproachToBody);
 
-                double distance = getclosestapproach(drawApproachToBody);
+                double distance = pcalcs.getclosestapproach(drawApproachToBody);
                 // Only draw when not on intercept course already. Was a bug where
                 // we would draw a line to nowhere when intercepting. This is better.
                 if (distance > drawApproachToBody.sphereOfInfluence)
@@ -1188,13 +1065,13 @@ namespace Protractor {
                     approach.enabled = true;
                     if (closeorbit.referenceBody == drawApproachToBody)
                     {
-                        approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getTruePositionAtUT(closestApproachTime)));
+                        approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getTruePositionAtUT(pdata.closestApproachTime)));
                     } else
                     {
-                        approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getPositionAtUT(closestApproachTime)));
+                        approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getPositionAtUT(pdata.closestApproachTime)));
                     }
 
-                    approach.SetPosition(1, ScaledSpace.LocalToScaledSpace(drawApproachToBody.orbit.getPositionAtUT(closestApproachTime)));
+                    approach.SetPosition(1, ScaledSpace.LocalToScaledSpace(drawApproachToBody.orbit.getPositionAtUT(pdata.closestApproachTime)));
 
                     float scale = (float)(0.004 * cam.Distance);
                     approach.SetWidth(scale, scale);
@@ -1241,6 +1118,7 @@ namespace Protractor {
             cfg["showdv"] = showdv;
             cfg["trackdv"] = trackdv;
             cfg["skinid"] = skinId;
+            cfg["updateinterval"] = updateInterval;
 
             Debug.Log("-------------Saved Protractor Settings-------------");
             cfg.save();
@@ -1266,437 +1144,12 @@ namespace Protractor {
             trackdv = cfg.GetValue<bool>("trackdv", true);
 
             skinId = cfg.GetValue<int>("skinid", (int)ProtractorModule.SkinType.Default);
+            updateInterval = cfg.GetValue<float>("updateinterval", 1.0f);
+            updateIntervalString = updateInterval.ToString("F");
 
             loaded = true;  //loaded
 
             Debug.Log("-------------Loaded Protractor Settings-------------");
-        }
-
-        /*
-         * Mathy stuff.
-         */
-        public double getclosestapproach(CelestialBody target)
-        {
-            Orbit closestorbit = new Orbit();
-            closestorbit = getclosestorbit(target);
-            if (closestorbit.referenceBody == target)
-            {
-                closestApproachTime = closestorbit.StartUT + closestorbit.timeToPe;
-                return closestorbit.PeA;
-            }
-            else if (closestorbit.referenceBody == target.referenceBody)
-            {
-                return mindistance(target, closestorbit.StartUT, closestorbit.period / 10, closestorbit) - target.Radius;
-            }
-            else
-            {
-                return mindistance(target, Planetarium.GetUniversalTime(), closestorbit.period / 10, closestorbit) - target.Radius;
-            }
-        }
-
-        public Orbit getclosestorbit(CelestialBody target)
-        {
-            Orbit checkorbit = vessel.orbit;
-            int orbitcount = 0;
-
-            // Search for target
-            while (checkorbit.nextPatch != null && checkorbit.patchEndTransition != Orbit.PatchTransitionType.FINAL &&
-                   orbitcount < 3)
-            {
-                checkorbit = checkorbit.nextPatch;
-                orbitcount += 1;
-                if (checkorbit.referenceBody == target)
-                {
-                    return checkorbit;
-                }
-
-            }
-            checkorbit = vessel.orbit;
-            orbitcount = 0;
-
-            // Search for target's referencebody
-            while (checkorbit.nextPatch != null && checkorbit.patchEndTransition != Orbit.PatchTransitionType.FINAL &&
-                   orbitcount < 3)
-            {
-                checkorbit = checkorbit.nextPatch;
-                orbitcount += 1;
-                if (checkorbit.referenceBody == target.orbit.referenceBody)
-                {
-                    return checkorbit;
-                }
-            }
-
-            return vessel.orbit;
-        }
-
-        public double mindistance(CelestialBody target, double time, double dt, Orbit vesselorbit)
-        {
-            double[] dist_at_int = new double[11];
-            for (int i = 0; i <= 10; i++)
-            {
-                double step = time + i * dt;
-                dist_at_int[i] = (target.getPositionAtUT(step) - vesselorbit.getPositionAtUT(step)).magnitude;
-            }
-            double mindist = dist_at_int.Min();
-            double maxdist = dist_at_int.Max();
-            int minindex = Array.IndexOf(dist_at_int, mindist);
-
-            if (drawApproachToBody == target)
-            {
-                closestApproachTime = time + minindex * dt;
-            }
-
-            if ((maxdist - mindist) / maxdist >= 0.00001)
-            {
-                mindist = mindistance(target, time + ((minindex - 1) * dt), dt / 5, vesselorbit);
-            }
-
-            return mindist;
-        }
-
-        // Projects two vectors to 2D plane and returns angle between them
-        public double Angle2d(Vector3d vector1, Vector3d vector2)
-        {
-            Vector3d v1 = Vector3d.Project(new Vector3d(vector1.x, 0, vector1.z), vector1);
-            Vector3d v2 = Vector3d.Project(new Vector3d(vector2.x, 0, vector2.z), vector2);
-            return Vector3d.Angle(v1, v2);
-        }
-
-        // Calculates phase angle between the current body and target body
-        public double CurrentPhase(CelestialBody target)
-        {
-            Vector3d vecthis = new Vector3d();
-            Vector3d vectarget = new Vector3d();
-            vectarget = target.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime());
-
-            // Vessel orbits a moon, target is a planet (going down)
-            if (target.referenceBody == Sun && orbiting == orbitbodytype.moon)
-            {
-                vecthis = vessel.mainBody.referenceBody.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime());
-            }
-            //vessel and target orbit same body (going parallel)
-            else if (vessel.mainBody == target.referenceBody)
-            {
-                vecthis = vessel.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime()); //going up
-            }
-            else
-            {
-                vecthis = vessel.mainBody.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime());
-            }
-
-            double phase = Angle2d(vecthis, vectarget);
-
-            vecthis = Quaternion.AngleAxis(90, Vector3d.forward) * vecthis;
-
-            if (Angle2d(vecthis, vectarget) > 90)
-            {
-                phase = 360 - phase;
-            }
-
-            return (phase + 360) % 360;
-        }
-
-        // Calculates angle between vessel's position and prograde of orbited body
-        public double CurrentEjectAngle(CelestialBody check)
-        {
-            Vector3d vesselvec = new Vector3d();
-            vesselvec = check == null ?
-                vessel.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime()) :
-                check.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime());
-
-            Vector3d bodyvec = new Vector3d();
-            bodyvec = orbiting == orbitbodytype.moon &&
-                check != null ?
-                  bodyvec = vessel.mainBody.orbit.referenceBody.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime()) :
-                  vessel.mainBody.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime()); //get planet's position relative to universe
-
-            double eject = Angle2d(vesselvec, Quaternion.AngleAxis(90, Vector3d.forward) * bodyvec);
-
-            if (Angle2d(vesselvec, Quaternion.AngleAxis(180, Vector3d.forward) * bodyvec) > Angle2d(vesselvec, bodyvec))
-            {
-                eject = 360 - eject; //use cross vector to determine up or down
-            }
-
-            return eject;
-        }
-
-        // Calculates phase angle for rendezvous between two bodies orbiting same parent
-        public double DesiredPhase(CelestialBody dest)
-        {
-            CelestialBody orig = vessel.mainBody;
-            double o_alt =
-                (vessel.mainBody == dest.orbit.referenceBody) ?
-                (vessel.mainBody.GetAltitude(vessel.findWorldCenterOfMass())) + dest.referenceBody.Radius : //going "up" from sun -> planet or planet -> moon
-                calcmeanalt(orig);  //going lateral from moon -> moon or planet -> planet
-            double d_alt = calcmeanalt(dest);
-            double u = dest.referenceBody.gravParameter;
-            double th = Math.PI * Math.Sqrt(Math.Pow(o_alt + d_alt, 3) / (8 * u));
-            double phase = (180 - Math.Sqrt(u / d_alt) * (th / d_alt) * (180 / Math.PI));
-            while (phase < 0)
-            {
-                phase += 360;
-            }
-            return phase % 360;
-        }
-
-        // For going from a moon to another planet exploiting oberth effect
-        public double OberthDesiredPhase(CelestialBody dest)
-        {
-            CelestialBody moon = vessel.mainBody;
-            CelestialBody planet = vessel.mainBody.referenceBody;
-            double planetalt = calcmeanalt(planet);
-            double destalt = calcmeanalt(dest);
-            double moonalt = calcmeanalt(moon);
-            double usun = dest.referenceBody.gravParameter;
-            double uplanet = planet.gravParameter;
-            double oberthalt = (planet.Radius + planet.atmosphereDepth) * 1.05;
-
-            double th1 = Math.PI * Math.Sqrt(Math.Pow(moonalt + oberthalt, 3) / (8 * uplanet));
-            double th2 = Math.PI * Math.Sqrt(Math.Pow(planetalt + destalt, 3) / (8 * usun));
-
-            double phase = (180 - Math.Sqrt(usun / destalt) * ((th1 + th2) / destalt) * (180 / Math.PI));
-            while (phase < 0)
-            {
-                phase += 360;
-            }
-            return phase % 360;
-        }
-
-        // Calculates ejection v to reach destination
-        public double CalculateDeltaV(CelestialBody dest)
-        {
-            if (vessel.mainBody == dest.orbit.referenceBody)
-            {
-                double radius = dest.referenceBody.Radius;
-                double u = dest.referenceBody.gravParameter;
-                double d_alt = calcmeanalt(dest);
-                double alt = (vessel.mainBody.GetAltitude(vessel.findWorldCenterOfMass())) + radius;
-                double v = Math.Sqrt(u / alt) * (Math.Sqrt((2 * d_alt) / (alt + d_alt)) - 1);
-                return Math.Abs((Math.Sqrt(u / alt) + v) - vessel.orbit.GetVel().magnitude);
-            }
-            else
-            {
-                CelestialBody orig = vessel.mainBody;
-                double d_alt = calcmeanalt(dest);
-                double o_radius = orig.Radius;
-                double u = orig.referenceBody.gravParameter;
-                double o_mu = orig.gravParameter;
-                double o_soi = orig.sphereOfInfluence;
-                double o_alt = calcmeanalt(orig);
-                double exitalt = o_alt + o_soi;
-                double v2 = Math.Sqrt(u / exitalt) * (Math.Sqrt((2 * d_alt) / (exitalt + d_alt)) - 1);
-                double r = o_radius + (vessel.mainBody.GetAltitude(vessel.findWorldCenterOfMass()));
-                double v = Math.Sqrt((r * (o_soi * v2 * v2 - 2 * o_mu) + 2 * o_soi * o_mu) / (r * o_soi));
-                return Math.Abs(v - vessel.orbit.GetVel().magnitude);
-            }
-        }
-
-        // Calculates ejection angle to reach destination body from origin body
-        public double CalculateDesiredEjectionAngle(CelestialBody orig, CelestialBody dest)
-        {
-            double o_alt = calcmeanalt(orig);
-            double d_alt = calcmeanalt(dest);
-            double o_soi = orig.sphereOfInfluence;
-            double o_radius = orig.Radius;
-            double o_mu = orig.gravParameter;
-            double u = orig.referenceBody.gravParameter;
-            double exitalt = o_alt + o_soi;
-            double v2 = Math.Sqrt(u / exitalt) * (Math.Sqrt((2 * d_alt) / (exitalt + d_alt)) - 1);
-            double r = o_radius + (vessel.mainBody.GetAltitude(vessel.findWorldCenterOfMass()));
-            double v = Math.Sqrt((r * (o_soi * v2 * v2 - 2 * o_mu) + 2 * o_soi * o_mu) / (r * o_soi));
-            double eta = Math.Abs(v * v / 2 - o_mu / r);
-            double h = r * v;
-            double e = Math.Sqrt(1 + ((2 * eta * h * h) / (o_mu * o_mu)));
-            double eject = (180 - (Math.Acos(1 / e) * (180 / Math.PI))) % 360;
-
-            eject = o_alt > d_alt ? 180 - eject : 360 - eject;
-
-            return vessel.orbit.inclination > 90 && !(vessel.Landed) ? 360 - eject : eject;
-        }
-
-        // Calculates eject angle for moon -> planet in preparation for planet -> planet transfer
-        public double MoonAngle()
-        {
-            CelestialBody orig = vessel.mainBody;
-            double o_alt = calcmeanalt(orig);
-            double d_alt = (vessel.mainBody.orbit.referenceBody.Radius + vessel.mainBody.orbit.referenceBody.atmosphereDepth) * 1.05;
-            double o_soi = orig.sphereOfInfluence;
-            double o_radius = orig.Radius;
-            double o_mu = orig.gravParameter;
-            double u = orig.referenceBody.gravParameter;
-            double exitalt = o_alt + o_soi;
-            double v2 = Math.Sqrt(u / exitalt) * (Math.Sqrt((2 * d_alt) / (exitalt + d_alt)) - 1);
-            double r = o_radius + (vessel.mainBody.GetAltitude(vessel.findWorldCenterOfMass()));
-            double v = Math.Sqrt((r * (o_soi * v2 * v2 - 2 * o_mu) + 2 * o_soi * o_mu) / (r * o_soi));
-            double eta = Math.Abs(v * v / 2 - o_mu / r);
-            double h = r * v;
-            double e = Math.Sqrt(1 + ((2 * eta * h * h) / (o_mu * o_mu)));
-            double eject = (180 - (Math.Acos(1 / e) * (180 / Math.PI))) % 360;
-
-            eject = o_alt > d_alt ? 180 - eject : 360 - eject;
-
-            return vessel.orbit.inclination > 90 && !(vessel.Landed) ? 360 - eject : eject;
-        }
-
-        public double AdjustEjectAngle(CelestialBody orig, CelestialBody dest)
-        {
-            double ang = CalculateDesiredEjectionAngle(orig, dest);
-            double adj = 0;
-            double time = (0.2 / 0.3) * burnlength(CalculateDeltaV(dest));
-            adj = ang - (360 * (time / vessel.orbit.period));
-            adj = adj < 0 ? adj += 360 : adj;
-            return adj;
-        }
-
-        public double calcmeanalt(CelestialBody body)
-        {
-            return body.orbit.semiMajorAxis * (1 + body.orbit.eccentricity * body.orbit.eccentricity / 2);
-        }
-
-        public double tmr()
-        {
-            Vector3d forward = vessel.transform.up;
-            double totalmass, thrustmax, thrustmin;
-            totalmass = thrustmax = thrustmin = 0;
-            foreach (Part p in vessel.parts)
-            {
-                if (p.physicalSignificance != Part.PhysicalSignificance.NONE)
-                {
-                    totalmass += p.mass;
-
-                    foreach (PartResource pr in p.Resources)
-                    {
-                        totalmass += pr.amount * PartResourceLibrary.Instance.GetDefinition(pr.info.id).density;
-                    }
-                }
-                if ((p.State == PartStates.ACTIVE) || (Staging.CurrentStage > Staging.lastStage && p.inverseStage == Staging.lastStage))
-                {
-                    if (p.Modules.Contains("ModuleEngines"))
-                    {
-                        foreach (PartModule pm in p.Modules)
-                        {
-                            if (pm != null && pm is ModuleEngines && pm.isActiveAndEnabled)
-                            {
-                                ModuleEngines me = (ModuleEngines)pm;
-                                //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
-                                if (me.isOperational && !me.getFlameoutState)
-                                {
-                                    //double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
-                                    //thrustmax += isp * me.maxFuelFlow;
-                                    //thrustmin += isp * me.minFuelFlow;
-                                    thrustmax += me.maxThrust;
-                                    thrustmin += me.minThrust;
-                                }
-                            }
-                        }
-                    }
-                    else if (p.Modules.Contains("ModuleEnginesFX"))
-                    {
-                        foreach (PartModule pm in p.Modules)
-                        {
-                            if (pm != null && pm is ModuleEnginesFX && pm.isActiveAndEnabled)
-                            {
-                                ModuleEnginesFX me = (ModuleEnginesFX)pm;
-                                //double amountforward = Vector3d.Dot(me.thrustTransform.rotation * me.thrust, forward);
-                                if (me.isOperational && !me.getFlameoutState)
-                                {
-                                    //double isp = me.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * me.g;
-                                    //thrustmax += isp * me.maxFuelFlow;
-                                    //thrustmin += isp * me.minFuelFlow;
-                                    thrustmax += me.maxThrust;
-                                    thrustmin += me.minThrust;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            maxthrustaccel = thrustmax / totalmass;
-            minthrustaccel = thrustmin / totalmass;
-
-            return thrustmax / totalmass;
-        }
-
-        // TODO: Account for thrust vector that is offset from CoM
-        double calcBurnTime(double deltaV, double initialMass, double thrust)
-        {
-            return initialMass * deltaV / thrust;
-        }
-
-        double calcThrust()
-        {
-            double totalThrust = 0.0;
-            Vessel vessel = FlightGlobals.fetch.activeVessel;
-
-            foreach (Part part in vessel.parts)
-            {
-                if (part.Modules.Contains("ModuleEngines"))
-                {
-                    foreach (PartModule module in part.Modules)
-                    {
-                        if (module != null && module is ModuleEngines && module.isActiveAndEnabled)
-                        {
-                            ModuleEngines engine = (ModuleEngines)module;
-                            if (engine.isOperational && !engine.getFlameoutState)
-                            {
-                                //double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
-                                //totalThrust += isp * engine.maxFuelFlow;
-                                totalThrust += engine.maxThrust;
-                            }
-                        }
-                    }
-                }
-                else if (part.Modules.Contains("ModuleEnginesFX"))
-                {
-                    foreach (PartModule module in part.Modules)
-                    {
-                        if (module != null && module is ModuleEnginesFX && module.isActiveAndEnabled)
-                        {
-                            ModuleEnginesFX engine = (ModuleEnginesFX)module;
-                            if (engine.isOperational && !engine.getFlameoutState)
-                            {
-                                //double isp = engine.atmosphereCurve.Evaluate((float)(vessel.staticPressurekPa * PhysicsGlobals.KpaToAtmospheres)) * engine.g;
-                                //totalThrust += isp * engine.maxFuelFlow;
-                                totalThrust += engine.maxThrust;
-                            }
-                        }
-                    }
-                }
-            }
-            return totalThrust;
-        }
-
-        /*
-        public string toSI(double d)
-        {
-            if (d >= 0)
-            {
-                int i = 0;
-                string[] units = { "m", "km", "Mm", "Gm", "Tm" };
-                for (i = 0; i <= 4; i++)
-                {
-                    if (d > 1000) { d /= 1000; } else { break; }
-                }
-                string result = string.Format("{0:0.000}", d);
-                int p = result.IndexOf(".") + 3;
-                return (result.Substring(0, p) + " " + units[i]);
-            }
-            else
-            {
-                return "----";
-            }
-        }
-        */
-
-        public double burnlength(double dv)
-        {
-            return dv / tmr();
-        }
-
-        public double thrustAccel()
-        {
-            tmr();
-            return (1.0 - throttle) * minthrustaccel + throttle * maxthrustaccel;
         }
 
         // More code from MechJeb2 for skin selection. Yay GPL3 licensing!
@@ -1785,109 +1238,6 @@ namespace Protractor {
             }
             return done;
         }
-
-
-        public static int HoursPerDay { get { return GameSettings.KERBIN_TIME ? 6 : 24; } }
-        public static int DaysPerYear { get { return GameSettings.KERBIN_TIME ? 426 : 365; } }
-
-        public static string TimeToDHMS(double seconds, int decimalPlaces = 0)
-        {
-            if (double.IsInfinity(seconds) || double.IsNaN(seconds))
-            {
-                return "Inf";
-            }
-
-            string ret = "";
-            bool showSecondsDecimals = decimalPlaces > 0;
-
-            try
-            {
-                string[] postfixes = { "y ", "d ", ":", ":", "" };
-                long[] intervals = { DaysPerYear * HoursPerDay * 3600, HoursPerDay * 3600, 3600, 60, 1 };
-
-                if (seconds < 0)
-                {
-                    ret += "-";
-                    seconds *= -1;
-                }
-
-                for (int i = 0; i < postfixes.Length; i++)
-                {
-                    long n = (long)(seconds / intervals[i]);
-                    bool first = ret.Length < 2;
-                    if (!first || n != 0 || i >= 2 || (i == postfixes.Length - 1 && ret == ""))
-                    {
-                        if (showSecondsDecimals && seconds < 60 && i == postfixes.Length -1)
-                        {
-                            ret += seconds.ToString("0." + new string('0', decimalPlaces));
-                        }
-                        else if (first)
-                        {
-                            ret += n.ToString();
-                        }
-                        else
-                        {
-                            ret += n.ToString("00");
-                        }
-
-                        ret += postfixes[i];
-                    }
-                    seconds -= n * intervals[i];
-                }
-
-            }
-            catch (Exception)
-            {
-                return "NaN";
-            }
-            return ret;
-        }
-
-        //Puts numbers into SI format, e.g. 1234 -> "1.234 k", 0.0045678 -> "4.568 m"
-        //maxPrecision is the exponent of the smallest place value that will be shown; for example
-        //if maxPrecision = -1 and digitsAfterDecimal = 3 then 12.345 will be formatted as "12.3"
-        //while 56789 will be formated as "56.789 k"
-        public static string ToSI(double d, int maxPrecision = -99, int sigFigs = 4)
-        {
-            if (d == 0 || double.IsInfinity(d) || double.IsNaN(d))
-            {
-                return d.ToString() + " ";
-            }
-
-            int exponent = (int)Math.Floor(Math.Log10(Math.Abs(d))); //exponent of d if it were expressed in scientific notation
-
-            string[] units = new string[] { "y", "z", "a", "f", "p", "n", "μ", "m", "", "k", "M", "G", "T", "P", "E", "Z", "Y" };
-            const int unitIndexOffset = 8; //index of "" in the units array
-            int unitIndex = (int)Math.Floor(exponent / 3.0) + unitIndexOffset;
-            if (unitIndex < 0)
-            {
-                unitIndex = 0;
-            }
-            if (unitIndex >= units.Length)
-            {
-                unitIndex = units.Length - 1;
-            }
-            string unit = units[unitIndex];
-
-            int actualExponent = (unitIndex - unitIndexOffset) * 3; //exponent of the unit we will us, e.g. 3 for k.
-            d /= Math.Pow(10, actualExponent);
-
-            int digitsAfterDecimal = sigFigs - (int)(Math.Ceiling(Math.Log10(Math.Abs(d))));
-
-            if (digitsAfterDecimal > actualExponent - maxPrecision)
-            {
-                digitsAfterDecimal = actualExponent - maxPrecision;
-            }
-            if (digitsAfterDecimal < 0)
-            {
-                digitsAfterDecimal = 0;
-            }
-
-            string ret = d.ToString("F" + digitsAfterDecimal) + " " + unit;
-
-            return ret;
-        }
-
     } // end of class
 
 } //end of namespace
