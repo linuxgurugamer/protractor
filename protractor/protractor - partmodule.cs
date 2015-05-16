@@ -37,13 +37,17 @@ namespace Protractor {
     {
         private ProtractorModule primary = null;
         private GameObject approach_obj;
+        /*
         private static Texture2D
             protractoriconOFF = new Texture2D(32, 32, TextureFormat.ARGB32, false),
             protractoriconON = new Texture2D(32, 32, TextureFormat.ARGB32, false),
             protractoricon = new Texture2D(30, 30, TextureFormat.ARGB32, false);
+        */
         private Dictionary<string, Color> bodycolorlist = new Dictionary<string, Color>();
+
         private ProtractorData pdata;
         private ProtractorCalcs pcalcs;
+
         private CelestialBody
             drawApproachToBody = null,
             focusbody = null,
@@ -75,12 +79,11 @@ namespace Protractor {
             datatitle,
             dataclose,
             dataintercept,
-            tooltipstyle,
-            iconstyle;
+            tooltipstyle;
+            //iconstyle;
         private LineRenderer approach;
         private PlanetariumCamera cam;
         private double
-            //throttle = 0,
             totaldv = 0,
             trackeddv = 0;
 
@@ -91,7 +94,6 @@ namespace Protractor {
         private string[] colsamples = new string[6] { "XXXXXXXX", "Xy XXXd 00:00:00XX", "00:00:00XX", "0000.0 m/sXX", "000.00 XXXX", "Moon Ω" };
         private int[] colwidths = new int[6] { 70, 120, 63, 71, 100, 71 };
 
-        //private ProtractorModule.orbitbodytype orbiting;
         private string
             psi_time,
             bodytip,
@@ -115,6 +117,10 @@ namespace Protractor {
 
         // Button for Toolbar
         private IButton button = null;
+
+        // Button for AppLauncher
+        public ApplicationLauncherButton appButton = null;
+
 
         // Initializes lists of bodies, planets, and parameters
         private void initialize()
@@ -184,7 +190,7 @@ namespace Protractor {
             dataintercept.alignment = TextAnchor.MiddleLeft;
             dataintercept.fontStyle = FontStyle.BoldAndItalic;
 
-            iconstyle = new GUIStyle();
+            //iconstyle = new GUIStyle();
 
             // Figure out the width of the fields in the GUI with a little font metrics
             // from sample strings that should be as wide as the field can be.
@@ -195,11 +201,31 @@ namespace Protractor {
 
             isGUIInitialized = true;
         }
-
+        /*
         public void loadicons()
         {
             protractoriconON.LoadImage(KSP.IO.File.ReadAllBytes<ProtractorModule>("protractor-on.png"));
             protractoriconOFF.LoadImage(KSP.IO.File.ReadAllBytes<ProtractorModule>("protractor-off.png"));
+        }
+        */
+
+        void OnGUIAppLauncherReady()
+        {
+            {
+                this.appButton = ApplicationLauncher.Instance.AddModApplication(
+                    delegate() {
+                        isVisible = true;
+                    },
+                    delegate() {
+                        isVisible = false;
+                    },
+                    null,
+                    null,
+                    null,
+                    null,
+                    ApplicationLauncher.AppScenes.FLIGHT | ApplicationLauncher.AppScenes.MAPVIEW,
+                    (Texture)GameDatabase.Instance.GetTexture("Protractor/icon", false));
+            }
         }
 
         public void drawGUI()
@@ -234,7 +260,7 @@ namespace Protractor {
             {
                 GUI.skin = null;
                 LoadSkin((SkinType)skinId);
-
+                /* Old code to show custom drawn app button kept just in case
                 if (!ToolbarManager.ToolbarAvailable && HighLogic.LoadedSceneIsFlight && !FlightDriver.Pause)
                 {
                     if (GUI.Button(new Rect(Screen.width / 6, Screen.height - 34, 32, 32), protractoricon, iconstyle))
@@ -250,6 +276,7 @@ namespace Protractor {
                         }
                     }
                 }
+                */
 
                 if (isVisible)
                 {
@@ -310,7 +337,16 @@ namespace Protractor {
                 else
                 {
                     Debug.Log("Protractor: Blizzy's toolbar NOT present");
-                    loadicons();
+                    //loadicons();
+                    if (appButton == null)
+                    {
+                        if (ApplicationLauncher.Ready)
+                        {
+                            OnGUIAppLauncherReady();
+                        } else {
+                            GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
+                        }
+                    }
                 }
 
                 RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
@@ -328,10 +364,19 @@ namespace Protractor {
                     button.TexturePath = "Protractor/icon";
                     button.ToolTip = "Toggle Protractor UI";
                     button.Visibility = new GameScenesVisibility(GameScenes.FLIGHT);
-                    button.OnClick += (e) =>
-                    {
+                    button.OnClick += (e) => {
                         isVisible = !isVisible;
                     };
+                }
+            } else {
+                if (appButton == null)
+                {
+                    if (ApplicationLauncher.Ready)
+                    {
+                        OnGUIAppLauncherReady();
+                    } else {
+                        GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
+                    }
                 }
             }
         }
@@ -344,10 +389,16 @@ namespace Protractor {
                 button.Destroy();
                 button = null;
             }
+            if (appButton != null && !ToolbarManager.ToolbarAvailable)
+            {
+                GameEvents.onGUIApplicationLauncherReady.Remove(OnGUIAppLauncherReady);
+                ApplicationLauncher.Instance.RemoveModApplication(appButton);
+            }
         }
 
         public void Update()
         {
+            /*
             if (isVisible)
             {
                 protractoricon = protractoriconON;
@@ -356,6 +407,7 @@ namespace Protractor {
             {
                 protractoricon = protractoriconOFF;
             }
+            */
         }
 
         public override void OnSave(ConfigNode node)
@@ -399,12 +451,9 @@ namespace Protractor {
             if (vessel.mainBody != lastknownmainbody)
             {
                 drawApproachToBody = null;
-                //getmoons();
-                //getplanets();
                 pdata.initialize(vessel);
                 lastknownmainbody = vessel.mainBody;
                 focusbody = null;
-                //getorbitbodytype();
             } //resets bodies, lines and collapse
 
             bodytip = focusbody == null ? "Click to focus" : "Click to unfocus";
@@ -412,8 +461,6 @@ namespace Protractor {
             phase_angle_time = "Toggle between angle and ESTIMATED time";
             psi_time = "Toggle between angle and ESTIMATED time";
             dv_time = "Toggle between ΔV and ESTIMATED\nburn time at full thrust";
-
-            //pcalcs.update(pdata.celestials);
 
             printheaders();
             if (showplanets)
@@ -818,7 +865,7 @@ namespace Protractor {
                         break;
                     //******eject angles******
                     case 2:
-                        if (pdata.getorbitbodytype() != ProtractorData.orbitbodytype.planet)
+                        if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.planet)
                         {
                             GUILayout.Label("----", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         } else {
@@ -839,7 +886,8 @@ namespace Protractor {
                                 if (adjustejectangle)
                                 {
                                     psidisplay = moondata.psi_time_adjusted;
-                                } else {
+                                } else
+                                {
                                     psidisplay = moondata.psi_time;
                                 }
                             } else {
