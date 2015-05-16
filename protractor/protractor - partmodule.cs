@@ -80,10 +80,9 @@ namespace Protractor {
         private LineRenderer approach;
         private PlanetariumCamera cam;
         private double
-            throttle = 0,
+            //throttle = 0,
             totaldv = 0,
             trackeddv = 0;
-            //closestApproachTime = -1;
 
         public float t_lastUpdate = 0.0f;
 
@@ -109,7 +108,7 @@ namespace Protractor {
         public static GUISkin compactSkin;
 
         public float updateInterval = 1.0f;
-        public string updateIntervalString = "1.0";
+        public string updateIntervalString = "1.00  ";
 
         // Main GUI visibility
         public static bool isVisible = true;
@@ -315,7 +314,7 @@ namespace Protractor {
                 }
 
                 RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
-                vessel.OnFlyByWire += new FlightInputCallback(fly);
+                //vessel.OnFlyByWire += new FlightInputCallback(fly);
             }
         }
 
@@ -385,7 +384,11 @@ namespace Protractor {
             if (t_lastUpdate > updateInterval)
             {
                 t_lastUpdate = 0.0f;
-                pcalcs.update(pdata.celestials);
+                // No need to update if not showing the GUI
+                if (isVisible)
+                {
+                    pcalcs.update(pdata.celestials);
+                }
             }
 
             base.OnFixedUpdate();
@@ -442,7 +445,7 @@ namespace Protractor {
             updateIntervalString = GUILayout.TextField(updateIntervalString, 10);
             try {
                 updateInterval = float.Parse(updateIntervalString);
-            } catch (Exception e) {
+            } catch {
                 updateInterval = 1.0f;
             }
             if (updateInterval < 0.001f || updateInterval > 10.0f)
@@ -663,27 +666,6 @@ namespace Protractor {
                         break;
                     //******printing psi angles******
                     case 2:
-                        //if (orbiting == orbitbodytype.planet)
-                        //{
-                        //    if (!adjustejectangle)
-                        //    {
-                        //        GUILayout.Label(String.Format("{0:0.00}°", (CalculateDesiredEjectionAngle(vessel.mainBody, planet) - CurrentEjectAngle(null) + 360) % 360), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                        //    }
-                        //    else if (adjustejectangle && tmr() > 0)
-                        //    {
-                        //        GUILayout.Label(String.Format("{0:0.00}°", (AdjustEjectAngle(vessel.mainBody, planet) - CurrentEjectAngle(null) + 360) % 360), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                        //    }
-                        //    else
-                        //    {
-                        //        GUILayout.Label("0 TMR", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                        //    }
-                        //}
-                        //else
-                        //{
-                        //    GUILayout.Label("----", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-
-                        //}
-
                         if (pdata.getorbitbodytype() != ProtractorData.orbitbodytype.planet)
                         {
                             GUILayout.Label("----", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
@@ -1087,11 +1069,12 @@ namespace Protractor {
             }
 
         }
-
+        /*
         public void fly(FlightCtrlState s)
         {
             throttle = s.mainThrottle;
         }
+        */
 
         /*
          * SETTINGS.
@@ -1145,7 +1128,7 @@ namespace Protractor {
 
             skinId = cfg.GetValue<int>("skinid", (int)ProtractorModule.SkinType.Default);
             updateInterval = cfg.GetValue<float>("updateinterval", 1.0f);
-            updateIntervalString = updateInterval.ToString("F");
+            updateIntervalString = updateInterval.ToString("F2");
 
             loaded = true;  //loaded
 

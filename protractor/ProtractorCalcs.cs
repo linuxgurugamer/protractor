@@ -39,7 +39,6 @@ namespace Protractor {
 
                 // Calculate theta
                 double data;
-                string datastring;
                 if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon) //get the data
                 {
                     data = (CurrentPhase(body) - OberthDesiredPhase(body) + 360) % 360;
@@ -84,9 +83,6 @@ namespace Protractor {
                     bodydata.psi_time_adjusted = "";
                     bodydata.psi_angle_adjusted = 0.0;
                 } else {
-                    double psidata;
-                    string psidisplay;
-
                     bodydata.psi_angle = (CalculateDesiredEjectionAngle(pdata.vessel.mainBody, body) - CurrentEjectAngle(null) + 360) % 360;
                     if (tmr() > 0)
                     {
