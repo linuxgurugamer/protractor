@@ -104,7 +104,10 @@ namespace Protractor {
             bodyList = new List<CelestialBody>(FlightGlobals.Bodies);
             foreach (CelestialBody body in FlightGlobals.Bodies)
             {
-                celestials.Add(body.name, new CelestialData(body));
+                if (!celestials.ContainsKey(body.name))
+                {
+                    celestials.Add(body.name, new CelestialData(body));
+                }
             }
         }
 
