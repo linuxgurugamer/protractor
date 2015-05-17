@@ -109,8 +109,9 @@ namespace Protractor {
         public static GUISkin defaultSkin;
         public static GUISkin compactSkin;
 
-        public float updateInterval = 1.0f;
-        public string updateIntervalString = "1.00  ";
+        public static readonly float updateInterval_def = 0.2f;
+        public float updateInterval = updateInterval_def;
+        public string updateIntervalString = "0.20  ";
 
         // Main GUI visibility
         public static bool isVisible = true;
@@ -1144,6 +1145,8 @@ namespace Protractor {
             cfg["trackdv"] = trackdv;
             cfg["skinid"] = skinId;
             cfg["updateinterval"] = updateInterval;
+            updateIntervalString = updateInterval.ToString("F2");
+            cfg["updateinterval"] = updateIntervalString;
 
             Debug.Log("-------------Saved Protractor Settings-------------");
             cfg.save();
@@ -1169,8 +1172,13 @@ namespace Protractor {
             trackdv = cfg.GetValue<bool>("trackdv", true);
 
             skinId = cfg.GetValue<int>("skinid", (int)ProtractorModule.SkinType.Default);
-            updateInterval = cfg.GetValue<float>("updateinterval", 1.0f);
-            updateIntervalString = updateInterval.ToString("F2");
+
+            updateIntervalString = cfg.GetValue<string>("updateinterval", "0.20");
+            try {
+                updateInterval = Single.Parse(updateIntervalString);
+            } catch {
+                updateInterval = updateInterval_def;
+            }
 
             loaded = true;  //loaded
 
