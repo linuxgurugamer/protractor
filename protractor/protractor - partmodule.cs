@@ -899,23 +899,17 @@ namespace Protractor {
                         break;
                         //******delta V******
                     case 3:
-                        if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon)
+                        double dv = moondata.deltaV;
+                        if (!dvtotime)
                         {
-                            GUILayout.Label("----", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                            GUILayout.Label(String.Format("{0:0.0} m/s", dv), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         else
                         {
-                            double dv = moondata.deltaV;
-                            if (!dvtotime)
-                            {
-                                GUILayout.Label(String.Format("{0:0.0} m/s", dv), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                            }
-                            else
-                            {
-                                GUILayout.Label(moondata.deltaV_time.ToString("F1") + "s", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                            }
+                            GUILayout.Label(moondata.deltaV_time.ToString("F1") + "s", datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         }
                         break;
+                        //******closest approach******
                     case 4:
                         double distance = moondata.closest_approach;
                         GUIStyle diststyle = datastyle;
