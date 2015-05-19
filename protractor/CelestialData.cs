@@ -12,11 +12,14 @@ namespace Protractor {
         public CelestialBody body;
         public string name;
         public double theta_angle;
-        public string theta_time;
+        public double theta_time;
+        public string theta_time_str;
         public double psi_angle;
-        public string psi_time;
+        public double psi_time;
+        public string psi_time_str;
         public double psi_angle_adjusted;
-        public string psi_time_adjusted;
+        public double psi_time_adjusted;
+        public string psi_time_adjusted_str;
         public double deltaV;
         public double deltaV_time;
         public double adv_ejection_angle;

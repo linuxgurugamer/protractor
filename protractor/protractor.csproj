@@ -33,6 +33,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="KACWrapper.cs" />
     <Compile Include="CelestialData.cs" />
     <Compile Include="ProtractorData.cs" />
     <Compile Include="ProtractorCalcs.cs" />

@@ -87,6 +87,14 @@ namespace Protractor {
         public float updateInterval = updateInterval_def;
         public string updateIntervalString = "0.20  ";
 
+        public static readonly double planetAlarmMargin_def = 60 * 60;
+        public double planetAlarmMargin = planetAlarmMargin_def;
+        public string planetAlarmMargin_str = "3600.00";
+
+        public static readonly double moonAlarmMargin_def = 60 * 5;
+        public double moonAlarmMargin = moonAlarmMargin_def;
+        public string moonAlarmMargin_str = "300.00";
+
         // Main GUI visibility
         public static bool isVisible = true;
 
@@ -129,6 +137,11 @@ namespace Protractor {
             bodycolorlist.Add("Eeloo", Utils.hextorgb("929292"));
             bodycolorlist.Add("Dres", Utils.hextorgb("917552"));
             bodycolorlist.Add("Pol", Utils.hextorgb("929d6d"));
+
+            if (!KACWrapper.InitKACWrapper())
+            {
+                Debug.Log("Protractor: KAC integration initialized.");
+            }
             Debug.Log("-------------Protractor Initialized-------------");
         }
 
@@ -226,7 +239,7 @@ namespace Protractor {
                     if (showsettings)
                     {
                         settingswindowPos = GUILayout.Window(557, settingswindowPos, settingsGUI,
-                            "Settings", GUILayout.Width(200), GUILayout.Height(100));
+                            "Settings", GUILayout.Width(250), GUILayout.Height(100));
                     }
 
                     windowPos = GUILayout.Window(556, windowPos, mainGUI, "Protractor v." + version, GUILayout.Width(1), GUILayout.Height(1)); //367
@@ -422,12 +435,42 @@ namespace Protractor {
             try {
                 updateInterval = float.Parse(updateIntervalString);
             } catch {
-                updateInterval = 1.0f;
+                updateInterval = updateInterval_def;
             }
             if (updateInterval < 0.001f || updateInterval > 10.0f)
             {
-                updateInterval = 1.0f;
+                updateInterval = updateInterval_def;
             }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("KAC Alarm Margin (planets): ");
+            planetAlarmMargin_str = GUILayout.TextField(planetAlarmMargin_str, 10);
+            try {
+                planetAlarmMargin = float.Parse(planetAlarmMargin_str);
+            } catch {
+                planetAlarmMargin = planetAlarmMargin_def;
+            }
+            if (planetAlarmMargin < 0.0 || planetAlarmMargin > 60*60*ProtractorCalcs.HoursPerDay*5)
+            {
+                planetAlarmMargin = planetAlarmMargin_def;
+            }
+            GUILayout.Label("s");
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("KAC Alarm Margin (moons): ");
+            moonAlarmMargin_str = GUILayout.TextField(moonAlarmMargin_str, 10);
+            try {
+                moonAlarmMargin = float.Parse(moonAlarmMargin_str);
+            } catch {
+                moonAlarmMargin = moonAlarmMargin_def;
+            }
+            if (moonAlarmMargin < 0.0 || moonAlarmMargin > 60*60*ProtractorCalcs.HoursPerDay)
+            {
+                moonAlarmMargin = moonAlarmMargin_def;
+            }
+            GUILayout.Label("s");
             GUILayout.EndHorizontal();
 
             GUILayout.Label("Current skin: " + (SkinType)skinId );
@@ -473,6 +516,7 @@ namespace Protractor {
                 "- Click on the icon in the bottom left to hide Protractor and its windows\n" +
                 "- Click on the number in \"Closest\" column to toggle the closest approach line on the map\n" +
                 "- Click on the name of a celestial body in the list to hide other bodies.\n" +
+                "  Click on the θ angle or time display to create a KAC alarm, if present.\n" +
                 "- Click on θ in the column headers to toggle between displaying an angle and an \n" +
                 " approximate time until the next launch window.\n" +
                 "- Click on Ψ in the column headers to toggle between displaying and angle and an\n" +
@@ -590,6 +634,26 @@ namespace Protractor {
             }
         }
 
+        // margin: Time before 'ut' we wish to trigger
+        // ut: Time of event. Time of alarm will be ut - margin.
+        public void AddAlarm(CelestialBody origin, CelestialBody destination, double margin, double ut)
+        {
+            // Add KAC alarm
+            if (KACWrapper.APIReady)
+            {
+                String tmpID = KACWrapper.KAC.CreateAlarm(KACWrapper.KACAPI.AlarmTypeEnum.TransferModelled,
+                    String.Format("{0} -> {1}", origin.name, destination.name),
+                    ut - margin);
+
+                KACWrapper.KACAPI.KACAlarm alarmNew = KACWrapper.KAC.Alarms.First(a => a.ID == tmpID);
+                alarmNew.Notes = "Alarm created by Protractor.";
+                alarmNew.AlarmMargin = margin;
+                alarmNew.AlarmAction = KACWrapper.KACAPI.AlarmActionEnum.KillWarp;
+                alarmNew.XferOriginBodyName = origin.name;
+                alarmNew.XferTargetBodyName = destination.name;
+            }
+        }
+
         public void printplanetdata()
         {
             foreach (CelestialBody planet in pdata.planets)
@@ -628,7 +692,7 @@ namespace Protractor {
                         string datastring;
                         if (thetatotime)    //convert to time or leave as angle
                         {
-                            datastring = planetdata.theta_time;
+                            datastring = planetdata.theta_time_str;
                         }
                         else
                         {
@@ -638,6 +702,12 @@ namespace Protractor {
                         GUI.skin.label.alignment = TextAnchor.MiddleRight;
                         GUILayout.Label(datastring, datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         GUI.skin.label.alignment = TextAnchor.MiddleLeft;
+
+                        if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
+                        {
+                            // Add KAC alarm on click
+                            AddAlarm(FlightGlobals.fetch.activeVessel.mainBody, planet, planetAlarmMargin, Planetarium.GetUniversalTime() + planetdata.theta_time);
+                        }
 
                         break;
                     //******printing psi angles******
@@ -662,9 +732,9 @@ namespace Protractor {
                             } else if (psitotime) {
                                 if (adjustejectangle)
                                 {
-                                    psidisplay = planetdata.psi_time_adjusted;
+                                    psidisplay = planetdata.psi_time_adjusted_str;
                                 } else {
-                                    psidisplay = planetdata.psi_time;
+                                    psidisplay = planetdata.psi_time_str;
                                 }
                             } else {
                                 psidisplay = String.Format("{0:0.00}°", psidata);
@@ -780,9 +850,8 @@ namespace Protractor {
                         string datastring;
                         if (thetatotime)    //convert to time or leave as angle
                         {
-                            datastring = moondata.theta_time;
-                        }
-                        else
+                            datastring = moondata.theta_time_str;
+                        } else
                         {
                             datastring = String.Format("{0:0.00}°", moondata.theta_angle);
                         }
@@ -790,6 +859,12 @@ namespace Protractor {
                         GUI.skin.label.alignment = TextAnchor.MiddleRight;
                         GUILayout.Label(datastring, datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         GUI.skin.label.alignment = TextAnchor.MiddleLeft;
+
+                        // Add KAC Alarm on click
+                        if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
+                        {
+                            AddAlarm(FlightGlobals.fetch.activeVessel.mainBody, moon, moonAlarmMargin, Planetarium.GetUniversalTime() + moondata.theta_time);
+                        }
                         
                         break;
                     //******eject angles******
@@ -814,10 +889,10 @@ namespace Protractor {
                             } else if (psitotime) {
                                 if (adjustejectangle)
                                 {
-                                    psidisplay = moondata.psi_time_adjusted;
+                                    psidisplay = moondata.psi_time_adjusted_str;
                                 } else
                                 {
-                                    psidisplay = moondata.psi_time;
+                                    psidisplay = moondata.psi_time_str;
                                 }
                             } else {
                                 psidisplay = String.Format("{0:0.00}°", psidata);
@@ -1076,6 +1151,10 @@ namespace Protractor {
             cfg["updateinterval"] = updateInterval;
             updateIntervalString = updateInterval.ToString("F2");
             cfg["updateinterval"] = updateIntervalString;
+            planetAlarmMargin_str = planetAlarmMargin.ToString("F2");
+            cfg["planetalarmmargin"] = planetAlarmMargin_str;
+            moonAlarmMargin_str = moonAlarmMargin.ToString("F2");
+            cfg["moonalarmmargin"] = moonAlarmMargin_str;
 
             Debug.Log("-------------Saved Protractor Settings-------------");
             cfg.save();
@@ -1107,6 +1186,20 @@ namespace Protractor {
                 updateInterval = Single.Parse(updateIntervalString);
             } catch {
                 updateInterval = updateInterval_def;
+            }
+
+            planetAlarmMargin_str = cfg.GetValue<string>("planetalarmmargin", "3600");
+            try {
+                planetAlarmMargin = Single.Parse(planetAlarmMargin_str);
+            } catch {
+                planetAlarmMargin = planetAlarmMargin_def;
+            }
+
+            moonAlarmMargin_str = cfg.GetValue<string>("moonalarmmargin", "300");
+            try {
+                moonAlarmMargin = Single.Parse(moonAlarmMargin_str);
+            } catch {
+                moonAlarmMargin = moonAlarmMargin_def;
             }
 
             loaded = true;  //loaded

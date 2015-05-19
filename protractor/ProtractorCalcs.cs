@@ -73,14 +73,17 @@ namespace Protractor {
                 {
                     data = Math.Abs((360 - data) / (delta_theta));
                 }
-                bodydata.theta_time = TimeToDHMS(data);
+                bodydata.theta_time = data;
+                bodydata.theta_time_str = TimeToDHMS(data);
 
                 // Calculate psi
                 if (pdata.getorbitbodytype() != ProtractorData.orbitbodytype.planet)
                 {
-                    bodydata.psi_time = "";
+                    bodydata.psi_time = -1;
+                    bodydata.psi_time_str = "";
                     bodydata.psi_angle = 0.0;
-                    bodydata.psi_time_adjusted = "";
+                    bodydata.psi_time_adjusted = -1;
+                    bodydata.psi_time_adjusted_str = "";
                     bodydata.psi_angle_adjusted = 0.0;
                 } else {
                     bodydata.psi_angle = (CalculateDesiredEjectionAngle(pdata.vessel.mainBody, body) - CurrentEjectAngle(null) + 360) % 360;
@@ -92,13 +95,16 @@ namespace Protractor {
                         bodydata.psi_angle_adjusted = -1;
                     }
 
-                    bodydata.psi_time = TimeToDHMS(bodydata.psi_angle / (360 / pdata.vessel.orbit.period));
+                    bodydata.psi_time = bodydata.psi_angle / (360 / pdata.vessel.orbit.period);
+                    bodydata.psi_time_str = TimeToDHMS(bodydata.psi_time);
                     if (bodydata.psi_angle_adjusted == -1)
                     {
-                        bodydata.psi_time_adjusted = "0 TMR";
+                        bodydata.psi_time_adjusted = -1;
+                        bodydata.psi_time_adjusted_str = "0 TMR";
                     } else
                     {
-                        bodydata.psi_time_adjusted = TimeToDHMS(bodydata.psi_angle_adjusted / (360 / pdata.vessel.orbit.period));
+                        bodydata.psi_time_adjusted = bodydata.psi_angle_adjusted / (360 / pdata.vessel.orbit.period);
+                        bodydata.psi_time_adjusted_str = TimeToDHMS(bodydata.psi_time_adjusted);
                     }
                 }
 
@@ -181,14 +187,17 @@ namespace Protractor {
                     data = Math.Abs((360 - data) / (delta_theta));
                 }
 
-                bodydata.theta_time = TimeToDHMS(data);
+                bodydata.theta_time = data;
+                bodydata.theta_time_str = TimeToDHMS(data);
 
                 // Calculate Psi
                 if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.planet) //vessel and moon share planet
                 {
-                    bodydata.psi_time = "";
+                    bodydata.psi_time = 0.0;
+                    bodydata.psi_time_str = "";
                     bodydata.psi_angle = 0.0;
-                    bodydata.psi_time_adjusted = "";
+                    bodydata.psi_time_adjusted = 0.0;
+                    bodydata.psi_time_adjusted_str = "";
                     bodydata.psi_angle_adjusted = 0.0;
                 }
                 else //vessel orbiting moon
@@ -202,13 +211,16 @@ namespace Protractor {
                         bodydata.psi_angle_adjusted = -1;
                     }
 
-                    bodydata.psi_time = TimeToDHMS(bodydata.psi_angle / (360 / pdata.vessel.orbit.period));
+                    bodydata.psi_time = bodydata.psi_angle / (360 / pdata.vessel.orbit.period);
+                    bodydata.psi_time_str = TimeToDHMS(bodydata.psi_time);
                     if (bodydata.psi_angle_adjusted == -1)
                     {
-                        bodydata.psi_time_adjusted = "0 TMR";
+                        bodydata.psi_time_adjusted = -1;
+                        bodydata.psi_time_adjusted_str = "0 TMR";
                     } else
                     {
-                        bodydata.psi_time_adjusted = TimeToDHMS(bodydata.psi_angle_adjusted / (360 / pdata.vessel.orbit.period));
+                        bodydata.psi_time_adjusted = bodydata.psi_angle_adjusted / (360 / pdata.vessel.orbit.period);
+                        bodydata.psi_time_adjusted_str = TimeToDHMS(bodydata.psi_time_adjusted);
                     }
                 }
 
