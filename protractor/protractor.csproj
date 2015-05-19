@@ -36,7 +36,7 @@
     <Compile Include="CelestialData.cs" />
     <Compile Include="ProtractorData.cs" />
     <Compile Include="ProtractorCalcs.cs" />
-    <Compile Include="protractor - partmodule.cs" />
+    <Compile Include="Protractor.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="ToolbarWrapper.cs">
       <Link>ToolbarWrapper.cs</Link>

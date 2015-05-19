@@ -3,27 +3,6 @@
 //Distributed according to GNU General Public License version 3, available at http://www.gnu.org/copyleft/gpl.html. All other rights reserved.
 //no warrantees of any kind are made with distribution, including but not limited to warranty of merchantability and warranty for a particular purpose.
 
-/*
- Changes in 2.4.7
- * Added (optional) support for blizzy78's Toolbar.
-
- Changes in 2.4.6
- * Fixed support for ModuleEngineFX
- * Added support for using Kerbin time (for 0.23.5)
-
- Changes in 2.4.5
- * added support for ModuleEngineFX
- 
- Todo list:
- * fix for disabled engines counting toward dv
- * usable amount for engine modules
- * warp-to-angle button?
- * toggle delta-v and target v?
- * debris/vessel tracking?
- * "lap" timer for dv?
- * closest approach on maneuver nodes
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,16 +12,11 @@ using System.Reflection;
 
 namespace Protractor {
 
-    public class ProtractorModule : PartModule
+    [KSPAddon(KSPAddon.Startup.Flight, false)]
+    //[KSPAddon(KSPAddon.Startup.EveryScene, false)]
+    public class Protractor : MonoBehaviour
     {
-        private ProtractorModule primary = null;
         private GameObject approach_obj;
-        /*
-        private static Texture2D
-            protractoriconOFF = new Texture2D(32, 32, TextureFormat.ARGB32, false),
-            protractoriconON = new Texture2D(32, 32, TextureFormat.ARGB32, false),
-            protractoricon = new Texture2D(30, 30, TextureFormat.ARGB32, false);
-        */
         private Dictionary<string, Color> bodycolorlist = new Dictionary<string, Color>();
 
         private ProtractorData pdata;
@@ -132,10 +106,10 @@ namespace Protractor {
             }
             loadsettings();
  
-            pdata = new ProtractorData(vessel);
+            pdata = new ProtractorData(FlightGlobals.fetch.activeVessel);
             pcalcs = new ProtractorCalcs(pdata);
 
-            lastknownmainbody = vessel.mainBody;
+            lastknownmainbody = FlightGlobals.fetch.activeVessel.mainBody;
 
             isInitialized = true;
 
@@ -191,8 +165,6 @@ namespace Protractor {
             dataintercept.alignment = TextAnchor.MiddleLeft;
             dataintercept.fontStyle = FontStyle.BoldAndItalic;
 
-            //iconstyle = new GUIStyle();
-
             // Figure out the width of the fields in the GUI with a little font metrics
             // from sample strings that should be as wide as the field can be.
             for (int i = 1; i < colheaders.Length; ++i)
@@ -202,13 +174,6 @@ namespace Protractor {
 
             isGUIInitialized = true;
         }
-        /*
-        public void loadicons()
-        {
-            protractoriconON.LoadImage(KSP.IO.File.ReadAllBytes<ProtractorModule>("protractor-on.png"));
-            protractoriconOFF.LoadImage(KSP.IO.File.ReadAllBytes<ProtractorModule>("protractor-off.png"));
-        }
-        */
 
         void OnGUIAppLauncherReady()
         {
@@ -231,7 +196,7 @@ namespace Protractor {
 
         public void drawGUI()
         {
-            primary = this;
+            Vessel vessel = FlightGlobals.fetch.activeVessel;
 
             if (!isInitialized)
             {
@@ -246,38 +211,10 @@ namespace Protractor {
             // So we constantly need to recheck and put it back if it's been zapped.
             CreateToolbarButton();
 
-            foreach (Part p in vessel.parts)
-            {
-                foreach (PartModule pm in p.Modules)
-                {
-                    if (pm.GetInstanceID() < this.GetInstanceID() && pm is ProtractorModule)
-                    {
-                        primary = (ProtractorModule)pm;
-                    }
-                }
-            }
-
-            if (vessel == FlightGlobals.ActiveVessel && primary == this)
+            if (vessel == FlightGlobals.ActiveVessel)
             {
                 GUI.skin = null;
                 LoadSkin((SkinType)skinId);
-                /* Old code to show custom drawn app button kept just in case
-                if (!ToolbarManager.ToolbarAvailable && HighLogic.LoadedSceneIsFlight && !FlightDriver.Pause)
-                {
-                    if (GUI.Button(new Rect(Screen.width / 6, Screen.height - 34, 32, 32), protractoricon, iconstyle))
-                    {
-                        if (isVisible == false)
-                        {
-                            isVisible = true;
-                        }
-                        else
-                        {
-                            isVisible = false;
-                            approach.enabled = false;
-                        }
-                    }
-                }
-                */
 
                 if (isVisible)
                 {
@@ -301,58 +238,54 @@ namespace Protractor {
             }
         }
 
-        public override void OnStart(PartModule.StartState state)
+        void Start()
         {
-            base.OnStart(state);
-            if (state != StartState.Editor)
+            if (!isInitialized)
             {
-                if (!isInitialized)
-                {
-                    initialize();
-                }
-                approach_obj = new GameObject("Line");
-                loadsettings();
-                if ((windowPos.x == 0) && (windowPos.y == 0))//windowPos is used to position the GUI window, lets set it in the center of the screen
-                {
-                    windowPos = new Rect(Screen.width / 2, Screen.height / 2, 10, 10);
-                }
+                initialize();
+            }
+            approach_obj = new GameObject("Line");
+            loadsettings();
+            if ((windowPos.x == 0) && (windowPos.y == 0))//windowPos is used to position the GUI window, lets set it in the center of the screen
+            {
+                windowPos = new Rect(Screen.width / 2, Screen.height / 2, 10, 10);
+            }
 
-                approach_obj.layer = 9;
-                cam = (PlanetariumCamera)GameObject.FindObjectOfType(typeof(PlanetariumCamera));
+            approach_obj.layer = 9;
+            cam = (PlanetariumCamera)GameObject.FindObjectOfType(typeof(PlanetariumCamera));
 
-                approach = approach_obj.AddComponent<LineRenderer>();
-                approach.transform.parent = null;
-                approach.enabled = false;
-                approach.SetColors(Color.green, Color.green);
-                approach.useWorldSpace = true;
-                approach.SetVertexCount(2);
-                approach.SetWidth(10, 10);  //was 15, 5
+            approach = approach_obj.AddComponent<LineRenderer>();
+            approach.transform.parent = null;
+            approach.enabled = false;
+            approach.SetColors(Color.green, Color.green);
+            approach.useWorldSpace = true;
+            approach.SetVertexCount(2);
+            approach.SetWidth(10, 10);  //was 15, 5
 
-                approach.material = ((MapView)GameObject.FindObjectOfType(typeof(MapView))).orbitLinesMaterial;
+            approach.material = ((MapView)GameObject.FindObjectOfType(typeof(MapView))).orbitLinesMaterial;
 
-                if (ToolbarManager.ToolbarAvailable)
+            if (ToolbarManager.ToolbarAvailable)
+            {
+                Debug.Log("Protractor: Blizzy's toolbar present");
+                CreateToolbarButton();
+            }
+            else
+            {
+                Debug.Log("Protractor: Blizzy's toolbar NOT present");
+                //loadicons();
+                if (appButton == null)
                 {
-                    Debug.Log("Protractor: Blizzy's toolbar present");
-                    CreateToolbarButton();
-                }
-                else
-                {
-                    Debug.Log("Protractor: Blizzy's toolbar NOT present");
-                    //loadicons();
-                    if (appButton == null)
+                    if (ApplicationLauncher.Ready)
                     {
-                        if (ApplicationLauncher.Ready)
-                        {
-                            OnGUIAppLauncherReady();
-                        } else {
-                            GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
-                        }
+                        OnGUIAppLauncherReady();
+                    } else {
+                        GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
                     }
                 }
-
-                RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
-                //vessel.OnFlyByWire += new FlightInputCallback(fly);
             }
+
+            RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
+            //vessel.OnFlyByWire += new FlightInputCallback(fly);
         }
 
         private void CreateToolbarButton()
@@ -385,6 +318,7 @@ namespace Protractor {
         // If using Blizzy78's Toolbar, the button *must* be destroyed OnDestroy
         public void OnDestroy()
         {
+            savesettings();
             if (button != null)
             {
                 button.Destroy();
@@ -411,19 +345,13 @@ namespace Protractor {
             */
         }
 
-        public override void OnSave(ConfigNode node)
-        {
-            savesettings();
-            base.OnSave(node);
-        }
-
         public void FixedUpdate()
         {
             if (!HighLogic.LoadedSceneIsFlight)
             {
                 return;
             }
-            if (vessel.situation != Vessel.Situations.PRELAUNCH)
+            if (FlightGlobals.fetch.activeVessel.situation != Vessel.Situations.PRELAUNCH)
             {
                 totaldv += TimeWarp.fixedDeltaTime * pcalcs.thrustAccel();
                 if (trackdv)
@@ -444,11 +372,11 @@ namespace Protractor {
                 }
             }
 
-            base.OnFixedUpdate();
         }
 
         public void mainGUI(int windowID)
         {
+            Vessel vessel = FlightGlobals.fetch.activeVessel;
             if (vessel.mainBody != lastknownmainbody)
             {
                 drawApproachToBody = null;
@@ -955,6 +883,7 @@ namespace Protractor {
 
         public void printvesseldata()
         {
+            Vessel vessel = FlightGlobals.fetch.activeVessel;
             GUILayout.BeginHorizontal();
             {
                 GUILayout.BeginVertical(GUILayout.Width(50));
@@ -1128,7 +1057,7 @@ namespace Protractor {
             {
                 return;
             }
-            KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<ProtractorModule>();
+            KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<Protractor>();
             cfg["config_version"] = version;
             cfg["mainpos"] = windowPos;
             cfg["manualpos"] = manualwindowPos;
@@ -1155,7 +1084,7 @@ namespace Protractor {
         public void loadsettings()
         {
             Debug.Log("-------------Loading settings...-------------");
-            KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<ProtractorModule>();
+            KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<Protractor>();
             cfg.load();
             Debug.Log("-------------Settings Opened-------------");
             windowPos = cfg.GetValue<Rect>("mainpos", new Rect(0, 0, 0, 0));
@@ -1171,7 +1100,7 @@ namespace Protractor {
             showdv = cfg.GetValue<bool>("showdv", true);
             trackdv = cfg.GetValue<bool>("trackdv", true);
 
-            skinId = cfg.GetValue<int>("skinid", (int)ProtractorModule.SkinType.Default);
+            skinId = cfg.GetValue<int>("skinid", (int)Protractor.SkinType.Default);
 
             updateIntervalString = cfg.GetValue<string>("updateinterval", "0.20");
             try {

@@ -7,6 +7,7 @@ clean:
 	-rm -rf bin
 
 package:
+	-rm -f Output/ProtractorContinued.zip
 	(cd Output; zip -r ProtractorContinued.zip Protractor)
 
 install:
