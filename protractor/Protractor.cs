@@ -9,6 +9,9 @@ using System.Linq;
 using UnityEngine;
 using System.Text.RegularExpressions;
 using System.Reflection;
+using KSP.UI.Screens;
+
+
 
 namespace Protractor {
 
@@ -190,6 +193,7 @@ namespace Protractor {
 
         void OnGUIAppLauncherReady()
         {
+			if( !this.appButton )
             {
                 this.appButton = ApplicationLauncher.Instance.AddModApplication(
                     delegate() {
@@ -297,9 +301,20 @@ namespace Protractor {
                 }
             }
 
-            RenderingManager.AddToPostDrawQueue(3, new Callback(drawGUI));
+
             //vessel.OnFlyByWire += new FlightInputCallback(fly);
         }
+
+
+		/// <summary>
+		/// Called by Unity to draw the GUI - can be called many times per frame.
+		/// </summary>
+		public void OnGUI () {
+			drawGUI( );
+		}
+
+
+
 
         private void CreateToolbarButton()
         {
