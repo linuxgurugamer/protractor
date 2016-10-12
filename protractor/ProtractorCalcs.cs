@@ -401,7 +401,7 @@ namespace Protractor {
             CelestialBody orig = pdata.vessel.mainBody;
             double o_alt =
                 (pdata.vessel.mainBody == dest.orbit.referenceBody) ?
-                (pdata.vessel.mainBody.GetAltitude(pdata.vessel.findWorldCenterOfMass())) + dest.referenceBody.Radius : //going "up" from sun -> planet or planet -> moon
+                (pdata.vessel.mainBody.GetAltitude(pdata.vessel.CoM)) + dest.referenceBody.Radius : //going "up" from sun -> planet or planet -> moon
                 calcmeanalt(orig);  //going lateral from moon -> moon or planet -> planet
             double d_alt = calcmeanalt(dest);
             double u = dest.referenceBody.gravParameter;
@@ -445,7 +445,7 @@ namespace Protractor {
                 double radius = dest.referenceBody.Radius;
                 double u = dest.referenceBody.gravParameter;
                 double d_alt = calcmeanalt(dest);
-                double alt = (pdata.vessel.mainBody.GetAltitude(pdata.vessel.findWorldCenterOfMass())) + radius;
+                double alt = (pdata.vessel.mainBody.GetAltitude(pdata.vessel.CoM)) + radius;
                 double v = Math.Sqrt(u / alt) * (Math.Sqrt((2 * d_alt) / (alt + d_alt)) - 1);
                 return Math.Abs((Math.Sqrt(u / alt) + v) - pdata.vessel.orbit.GetVel().magnitude);
             }
@@ -460,7 +460,7 @@ namespace Protractor {
                 double o_alt = calcmeanalt(orig);
                 double exitalt = o_alt + o_soi;
                 double v2 = Math.Sqrt(u / exitalt) * (Math.Sqrt((2 * d_alt) / (exitalt + d_alt)) - 1);
-                double r = o_radius + (pdata.vessel.mainBody.GetAltitude(pdata.vessel.findWorldCenterOfMass()));
+                double r = o_radius + (pdata.vessel.mainBody.GetAltitude(pdata.vessel.CoM));
                 double v = Math.Sqrt((r * (o_soi * v2 * v2 - 2 * o_mu) + 2 * o_soi * o_mu) / (r * o_soi));
                 return Math.Abs(v - pdata.vessel.orbit.GetVel().magnitude);
             }
@@ -477,7 +477,7 @@ namespace Protractor {
             double u = orig.referenceBody.gravParameter;
             double exitalt = o_alt + o_soi;
             double v2 = Math.Sqrt(u / exitalt) * (Math.Sqrt((2 * d_alt) / (exitalt + d_alt)) - 1);
-            double r = o_radius + (pdata.vessel.mainBody.GetAltitude(pdata.vessel.findWorldCenterOfMass()));
+            double r = o_radius + (pdata.vessel.mainBody.GetAltitude(pdata.vessel.CoM));
             double v = Math.Sqrt((r * (o_soi * v2 * v2 - 2 * o_mu) + 2 * o_soi * o_mu) / (r * o_soi));
             double eta = Math.Abs(v * v / 2 - o_mu / r);
             double h = r * v;
@@ -501,7 +501,7 @@ namespace Protractor {
             double u = orig.referenceBody.gravParameter;
             double exitalt = o_alt + o_soi;
             double v2 = Math.Sqrt(u / exitalt) * (Math.Sqrt((2 * d_alt) / (exitalt + d_alt)) - 1);
-            double r = o_radius + (pdata.vessel.mainBody.GetAltitude(pdata.vessel.findWorldCenterOfMass()));
+            double r = o_radius + (pdata.vessel.mainBody.GetAltitude(pdata.vessel.CoM));
             double v = Math.Sqrt((r * (o_soi * v2 * v2 - 2 * o_mu) + 2 * o_soi * o_mu) / (r * o_soi));
             double eta = Math.Abs(v * v / 2 - o_mu / r);
             double h = r * v;
