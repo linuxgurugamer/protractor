@@ -166,3 +166,7 @@ pip-log.txt
 Output/
 *.sln
 *.userprefs
+
+
+# SVN
+.svn

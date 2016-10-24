@@ -300,8 +300,6 @@ namespace Protractor {
                     }
                 }
             }
-
-
             //vessel.OnFlyByWire += new FlightInputCallback(fly);
         }
 
@@ -361,16 +359,7 @@ namespace Protractor {
 
         public void Update()
         {
-            /*
-            if (isVisible)
-            {
-                protractoricon = protractoriconON;
-            }
-            else
-            {
-                protractoricon = protractoriconOFF;
-            }
-            */
+
         }
 
 
@@ -386,16 +375,6 @@ namespace Protractor {
             Vessel vessel = FlightGlobals.fetch.activeVessel;
             if( vessel == FlightGlobals.ActiveVessel )
             {
-/*
-                if( vessel != vessel ) // vessel changed, nuke everything
-                {
-                    Debug.Log( "PROTRACTOR: vessel changed, nuke everything" );
-                    drawApproachToBody = null;
-                    pdata.initialize();
-                    lastknownmainbody = vessel.mainBody;
-                    focusbody = null;
-                }
-*/
                 if( vessel.situation != Vessel.Situations.PRELAUNCH )
                 {
                     totaldv += TimeWarp.fixedDeltaTime * pcalcs.thrustAccel();
@@ -1136,13 +1115,12 @@ namespace Protractor {
             }
         }
 
-        public void drawApproach()
+        public void drawApproach( )
         {
             if (drawApproachToBody != null && MapView.MapIsEnabled && pdata.closestApproachTime > 0)
             {
                 //approach.enabled = true;
                 Orbit closeorbit = pcalcs.getclosestorbit(drawApproachToBody);
-
                 double distance = pcalcs.getclosestapproach(drawApproachToBody);
                 // Only draw when not on intercept course already. Was a bug where
                 // we would draw a line to nowhere when intercepting. This is better.
@@ -1152,24 +1130,25 @@ namespace Protractor {
                     if (closeorbit.referenceBody == drawApproachToBody)
                     {
                         approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getTruePositionAtUT(pdata.closestApproachTime)));
-                    } else
+                    }
+					else
                     {
                         approach.SetPosition(0, ScaledSpace.LocalToScaledSpace(closeorbit.getPositionAtUT(pdata.closestApproachTime)));
                     }
-
                     approach.SetPosition(1, ScaledSpace.LocalToScaledSpace(drawApproachToBody.orbit.getPositionAtUT(pdata.closestApproachTime)));
-
                     float scale = (float)(0.004 * cam.Distance);
                     approach.SetWidth(scale, scale);
                 }
                 else
                 {
-                    approach.enabled = false;
+					if( approach != null )
+						approach.enabled = false;
                 }
             }
             else
             {
-                approach.enabled = false;
+				if( approach != null )
+					approach.enabled = false;
             }
 
         }

@@ -38,10 +38,8 @@
     <Compile Include="ProtractorData.cs" />
     <Compile Include="ProtractorCalcs.cs" />
     <Compile Include="Protractor.cs" />
+    <Compile Include="ToolbarWrapper.cs" />
     <Compile Include="Utils.cs" />
-    <Compile Include="ToolbarWrapper.cs">
-      <Link>ToolbarWrapper.cs</Link>
-    </Compile>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">

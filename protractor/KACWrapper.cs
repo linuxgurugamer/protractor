@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
+//using System.Linq;
 using System.Reflection;
 using System.Text;
 
@@ -99,11 +99,7 @@ namespace Protractor
             LogFormatted("Attempting to Grab KAC Types...");
 
             //find the base type
-            KACType = AssemblyLoader.loadedAssemblies
-                .Select(a => a.assembly.GetExportedTypes())
-                .SelectMany(t => t)
-                .FirstOrDefault(t => t.FullName == "KerbalAlarmClock.KerbalAlarmClock");
-
+            KACType = getType( "KerbalAlarmClock.KerbalAlarmClock" );
             if (KACType == null)
             {
                 return false;
@@ -117,11 +113,7 @@ namespace Protractor
             }
             
             //now the Alarm Type
-            KACAlarmType = AssemblyLoader.loadedAssemblies
-                .Select(a => a.assembly.GetExportedTypes())
-                .SelectMany(t => t)
-                .FirstOrDefault(t => t.FullName == "KerbalAlarmClock.KACAlarm");
-
+			KACAlarmType = getType( "KerbalAlarmClock.KACAlarm" );
             if (KACAlarmType == null)
             {
                 return false;
@@ -150,6 +142,20 @@ namespace Protractor
             _KACWrapped = true;
             return true;
         }
+
+
+		internal static Type getType(string name) {
+			Type type = null;
+			AssemblyLoader.loadedAssemblies.TypeOperation(t => {
+				if (t.FullName == name) {
+					type = t;
+				}
+			});
+			return type;
+		}
+
+
+
 
         /// <summary>
         /// The Type that is an analogue of the real KAC. This lets you access all the API-able properties and Methods of the KAC
