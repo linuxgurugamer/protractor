@@ -108,6 +108,34 @@ namespace Protractor {
         public ApplicationLauncherButton appButton = null;
 
 
+
+
+		protected virtual void Awake()
+		{
+		   if (!ToolbarManager.ToolbarAvailable)
+		   {
+			  // subscribe event listeners
+			  GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
+			  GameEvents.onGUIApplicationLauncherUnreadifying.Add(OnGUIAppLauncherUnreadifying);
+		   }
+		}
+
+ 
+
+		void OnGUIAppLauncherUnreadifying(GameScenes scene)
+		{
+		   // remove button
+		   if ((ApplicationLauncher.Instance != null) && (appButton != null))
+		   {
+			  ApplicationLauncher.Instance.RemoveModApplication(appButton);
+		   }
+		}
+
+
+
+
+
+
         // Initializes lists of bodies, planets, and parameters
         private void initialize()
         {
@@ -295,8 +323,6 @@ namespace Protractor {
                     if (ApplicationLauncher.Ready)
                     {
                         OnGUIAppLauncherReady();
-                    } else {
-                        GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
                     }
                 }
             }
@@ -334,28 +360,32 @@ namespace Protractor {
                     if (ApplicationLauncher.Ready)
                     {
                         OnGUIAppLauncherReady();
-                    } else {
-                        GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
                     }
                 }
             }
         }
 
         // If using Blizzy78's Toolbar, the button *must* be destroyed OnDestroy
-        public void OnDestroy()
-        {
-            savesettings();
-            if (button != null)
-            {
-                button.Destroy();
-                button = null;
-            }
-            if (appButton != null && !ToolbarManager.ToolbarAvailable)
-            {
-                GameEvents.onGUIApplicationLauncherReady.Remove(OnGUIAppLauncherReady);
-                ApplicationLauncher.Instance.RemoveModApplication(appButton);
-            }
-        }
+		public void OnDestroy()
+		{
+		   savesettings();
+		   if (button != null)
+		   {
+			  button.Destroy();
+			  button = null;
+		   }
+
+		   if (!ToolbarManager.ToolbarAvailable)
+		   {
+			  GameEvents.onGUIApplicationLauncherReady.Remove(OnGUIAppLauncherReady);
+			  GameEvents.onGUIApplicationLauncherUnreadifying.Remove(OnGUIAppLauncherUnreadifying);
+
+			  if (appButton != null)
+			  {
+				 ApplicationLauncher.Instance.RemoveModApplication(appButton);
+			  }
+		   }
+		}
 
         public void Update()
         {
