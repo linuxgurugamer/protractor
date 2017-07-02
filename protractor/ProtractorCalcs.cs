@@ -314,8 +314,19 @@ namespace Protractor {
             double[] dist_at_int = new double[11];
             for (int i = 0; i <= 10; i++)
             {
-                double step = time + i * dt;
-                dist_at_int[i] = (target.getPositionAtUT(step) - vesselorbit.getPositionAtUT(step)).magnitude;
+				dist_at_int[i] = double.MaxValue;
+				try
+				{
+					double step = time + i * dt;
+					Vector3d TargetPos = target.getPositionAtUT(step);
+					Vector3d VesselPos = vesselorbit.getPositionAtUT(step);
+					dist_at_int[i] = ( TargetPos - VesselPos ).magnitude;
+				}
+				catch( Exception )
+				{
+					// Prevent [LOG 21:12:14.248] getObtAtUT infinite UT on elliptical orbit UT: Infinity, returning NaN
+				}
+				
             }
             double mindist = dist_at_int.Min();
             double maxdist = dist_at_int.Max();
