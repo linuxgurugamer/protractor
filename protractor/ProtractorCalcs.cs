@@ -311,16 +311,25 @@ namespace Protractor {
 
         public double mindistance(CelestialBody target, double time, double dt, Orbit vesselorbit)
         {
+			// Prevent [LOG 21:12:14.248] getObtAtUT infinite UT on elliptical orbit UT: Infinity, returning NaN
+			if( double.IsInfinity( time ) || double.IsInfinity( dt ) || double.IsNaN( time ) || double.IsNaN( dt ) )
+				return target.sphereOfInfluence + 100;
+
+
+
             double[] dist_at_int = new double[11];
             for (int i = 0; i <= 10; i++)
             {
-				dist_at_int[i] = double.MaxValue;
+				dist_at_int[i] = target.sphereOfInfluence + 100;
 				try
 				{
 					double step = time + i * dt;
-					Vector3d TargetPos = target.getPositionAtUT(step);
-					Vector3d VesselPos = vesselorbit.getPositionAtUT(step);
-					dist_at_int[i] = ( TargetPos - VesselPos ).magnitude;
+					if( !double.IsInfinity( step ) )
+					{
+						Vector3d TargetPos = target.getPositionAtUT(step);
+						Vector3d VesselPos = vesselorbit.getPositionAtUT(step);
+						dist_at_int[i] = ( TargetPos - VesselPos ).magnitude;
+					}
 				}
 				catch( Exception )
 				{
