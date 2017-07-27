@@ -1,0 +1,30 @@
+﻿[DONE] Fixed log spamming
+[DONE] Remove unused code
+[DONE] Remove skins and associated code
+[DONE] Changed addon startup and lifetime
+[DONE] F2 Support
+[DONE] Only draw when Launcher exists
+[DONE] Use my toolbarcode
+[DONE] Use my logger
+[DONE] Class for help window
+[DONE] Class for settings window
+[DONE] Using internal values for orbit renderer
+
+Class for Config
+Store window pos
+Settings editable
+Correct help text
+
+
+
+
+KAC Alarm wrong settings
+
+
+Class for main window
+Show in KSC
+Show in Tracking station
+New icons
+Do we have body or vessel?
+
+

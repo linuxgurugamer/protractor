@@ -32,13 +32,26 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Buttons\AppLauncherButton.cs" />
+    <Compile Include="Buttons\BlizzysToolbarButton.cs" />
+    <Compile Include="Buttons\IToolbarButton.cs" />
+    <Compile Include="Buttons\ToolbarWrapper.cs" />
+    <Compile Include="Buttons\UnifiedButton.cs" />
+    <Compile Include="Config.cs" />
+    <Compile Include="HelpWindow.cs" />
+    <Compile Include="Lib\Logger.cs" />
+    <Compile Include="Lib\Logging.cs" />
+    <Compile Include="Lib\StreamEx.cs" />
+    <Compile Include="Lib\TextureHelper.cs" />
+    <Compile Include="Lib\Utilities.cs" />
+    <Compile Include="Lib\Window.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="KACWrapper.cs" />
     <Compile Include="CelestialData.cs" />
     <Compile Include="ProtractorData.cs" />
     <Compile Include="ProtractorCalcs.cs" />
     <Compile Include="Protractor.cs" />
-    <Compile Include="ToolbarWrapper.cs" />
+    <Compile Include="SettingsWindow.cs" />
     <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -55,6 +68,34 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\Games\KSP\KSP_Real\KSP_x64_Data\Managed\UnityEngine.UI.dll</HintPath>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="icons\close.png" />
+    <EmbeddedResource Include="icons\help.png" />
+    <EmbeddedResource Include="icons\icon-small.png" />
+    <EmbeddedResource Include="icons\icon.png" />
+    <EmbeddedResource Include="icons\resize.png" />
+    <EmbeddedResource Include="icons\settings.png" />
+    <Content Include="Output\Protractor\cc-0.txt" />
+    <Content Include="Output\Protractor\gpl.txt" />
+    <Content Include="Output\Protractor\mit.txt" />
+    <Content Include="ToDo.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Output\Protractor\LICENSE" />
+    <None Include="Output\Protractor\Parts\calc-diffuse.dds" />
+    <None Include="Output\Protractor\Parts\calc-emissive.dds" />
+    <None Include="Output\Protractor\Parts\calc-normal_NRM.dds" />
+    <None Include="Output\Protractor\Parts\calc.mu" />
+    <None Include="Output\Protractor\Parts\calcwithtape.mu" />
+    <None Include="Output\Protractor\Parts\protractor-plain.cfg" />
+    <None Include="Output\Protractor\Parts\protractor-taped.cfg" />
+    <None Include="Output\Protractor\Parts\tape-diffuse.dds" />
+    <None Include="Output\Protractor\Protractor.version" />
+    <None Include="Output\Protractor\ProtractorChanges.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Output\Protractor\Plugins\PluginData\protractor\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!--
@@ -80,4 +121,14 @@ copy "$(TargetPath)" "\home\michel\protractor\newest version\Plugins"</PostBuild
       </Properties>
     </MonoDevelop>
   </ProjectExtensions>
+  <PropertyGroup>
+    <PostBuildEvent>SET PATHOUT=C:\Games\KSP\KSP_Test\GameData\Protractor
+IF NOT EXIST "%25PATHOUT%25" (
+MKDIR "%25PATHOUT%25"
+) 
+
+copy "$(TargetPath)" "%25PATHOUT%25"
+robocopy "$(ProjectDir)Output\Protractor" "%25PATHOUT%25" /E
+exit 0</PostBuildEvent>
+  </PropertyGroup>
 </Project>

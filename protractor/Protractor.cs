@@ -3,178 +3,336 @@
 //Distributed according to GNU General Public License version 3, available at http://www.gnu.org/copyleft/gpl.html. All other rights reserved.
 //no warrantees of any kind are made with distribution, including but not limited to warranty of merchantability and warranty for a particular purpose.
 
+
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
-using System.Text.RegularExpressions;
+using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine;
 using KSP.UI.Screens;
+using ZKeyButtons;
 
 
 
 namespace Protractor {
-
-    [KSPAddon(KSPAddon.Startup.Flight, false)]
-    //[KSPAddon(KSPAddon.Startup.EveryScene, false)]
+    [KSPAddon(KSPAddon.Startup.MainMenu, true)]
     public class Protractor : MonoBehaviour
     {
-        private GameObject approach_obj;
-        private Dictionary<string, Color> bodycolorlist = new Dictionary<string, Color>();
+		#region FIELDS
+			public const string BLIZZY_NAMESPACE =			"ZKeyAerospace";
+			private ZKeyLib.Logger							_logger;
+			private GameObject								approach_obj;
+			private Dictionary<string, Color>				bodycolorlist = new Dictionary<string, Color>();
+			public Config Config							{ get; private set; }
 
-        private ProtractorData pdata;
-        private ProtractorCalcs pcalcs;
+			private UnifiedButton							_protractorMainButton;
+			private SettingsWindow							_settingsWindow;
+			private HelpWindow								_helpWindow;
+			private bool									_launcherVisible;	// If the toolbar is shown
+			private bool									_UiHidden;			// If the user hit F2 
 
-        private CelestialBody
-            drawApproachToBody = null,
-            focusbody = null,
-            lastknownmainbody;
-        protected Rect
-            manualwindowPos,
-            settingswindowPos,
-            windowPos;
-        private Vector2 scrollposition;
-        private bool
-            psitotime = false,
-            thetatotime = false,
-            dvtotime = false,
-            adjustejectangle = false,
-            showmanual = true,
-            showsettings = false,
-            isInitialized = false,
-            isGUIInitialized = false,
-            loaded = false,
-            showplanets = true,
-            showadvanced = false,
-            showdv = false,
-            trackdv = false,
-            showmoons = true;
-        private GUIStyle
-            boldstyle,
-            datastyle,
-            databox,
-            datatitle,
-            dataclose,
-            dataintercept,
-            tooltipstyle;
-            //iconstyle;
-        private LineRenderer approach;
-        private PlanetariumCamera cam;
-        private double
-            totaldv = 0,
-            trackeddv = 0;
 
-        public float t_lastUpdate = 0.0f;
+			private ProtractorData pdata;
+			private ProtractorCalcs pcalcs;
 
-        // Sample strings for GUI fields for font metrics
-        private string[] colheaders = new string[6] { "", "θ", "Ψ", "Δv", "Closest", "Moon Ω" };
-        private string[] colsamples = new string[6] { "XXXXXXXX", "Xy XXXd 00:00:00XX", "00:00:00XX", "0000.0 m/sXX", "000.00 XXXX", "Moon Ω" };
-        private int[] colwidths = new int[6] { 70, 120, 63, 71, 100, 71 };
+			private CelestialBody
+				drawApproachToBody = null,
+				focusbody = null,
+				lastknownmainbody;
+			protected Rect windowPos;
+//			private Vector2 scrollposition;
+			private bool
+				psitotime = false,
+				thetatotime = false,
+				dvtotime = false,
+				adjustejectangle = false,
+				isGUIInitialized = false;
 
-        private string
-            psi_time,
-            bodytip,
-            phase_angle_time,
-            linetip,
-            dv_time;
-        private string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
-        // The Id of the currently selected GUI skin
-        public int skinId = 0;
+			
+			private GUIStyle
+				boldstyle,
+				datastyle,
+				databox,
+				datatitle,
+				dataclose,
+				dataintercept,
+				tooltipstyle;
+				//iconstyle;
+			private LineRenderer approach;
+			private PlanetariumCamera cam;
+			private double
+				totaldv = 0,
+				trackeddv = 0;
 
-        public enum SkinType { Default, KSP, Compact }
-        public static GUISkin defaultSkin;
-        public static GUISkin compactSkin;
+			public float t_lastUpdate = 0.0f;
 
-        public static readonly float updateInterval_def = 0.2f;
-        public float updateInterval = updateInterval_def;
-        public string updateIntervalString = "0.20  ";
+			// Sample strings for GUI fields for font metrics
+			private string[] colheaders = new string[6] { "", "θ", "Ψ", "Δv", "Closest", "Moon Ω" };
+			private string[] colsamples = new string[6] { "XXXXXXXX", "Xy XXXd 00:00:00XX", "00:00:00XX", "0000.0 m/sXX", "000.00 XXXX", "Moon Ω" };
+			private int[] colwidths = new int[6] { 70, 120, 63, 71, 100, 71 };
 
-        public static readonly double planetAlarmMargin_def = 60 * 60;
-        public double planetAlarmMargin = planetAlarmMargin_def;
-        public string planetAlarmMargin_str = "3600.00";
-
-        public static readonly double moonAlarmMargin_def = 60 * 5;
-        public double moonAlarmMargin = moonAlarmMargin_def;
-        public string moonAlarmMargin_str = "300.00";
-
-        // Main GUI visibility
-        public static bool isVisible = true;
-
-        // Button for Toolbar
-        private IButton button = null;
-
-        // Button for AppLauncher
-        public ApplicationLauncherButton appButton = null;
+			private string
+				psi_time,
+				bodytip,
+				phase_angle_time,
+				linetip,
+				dv_time;
 
 
 
 
-		protected virtual void Awake()
+
+			// Main GUI visibility
+			public static bool isVisible = true;
+
+
+		#endregion
+
+
+
+		#region METHODS For Unity
+		// Called by Unity once to initialize the class.
+		protected void Awake( )
 		{
-		   if (!ToolbarManager.ToolbarAvailable)
-		   {
-			  // subscribe event listeners
-			  GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
-			  GameEvents.onGUIApplicationLauncherUnreadifying.Add(OnGUIAppLauncherUnreadifying);
-		   }
-		}
+			_logger = new ZKeyLib.Logger( this );
+			_logger.Info( "Protractor: Awake" );
 
- 
-
-		void OnGUIAppLauncherUnreadifying(GameScenes scene)
-		{
-		   // remove button
-		   if ((ApplicationLauncher.Instance != null) && (appButton != null))
-		   {
-			  ApplicationLauncher.Instance.RemoveModApplication(appButton);
-		   }
+				// subscribe event listeners
+				GameEvents.onGUIApplicationLauncherReady.Add ( Load );
+				GameEvents.onGUIApplicationLauncherDestroyed.Add( Unload );
+			_logger.Info( "Protractor: Awake DONE" );
 		}
 
 
 
-
-
-
-        // Initializes lists of bodies, planets, and parameters
-        private void initialize()
+		// Called by Unity once to initialize the class, just before Update is called.
+		protected void Start( )
         {
-            if (isInitialized)
-            {
-                return;
-            }
-            loadsettings();
- 
+			_logger.Info( "Protractor: Start" );
+
+			// Config
+			Config = new Config( );
+			Config.Load( );
+
+
+			// Settings window
+			_settingsWindow = new SettingsWindow( this );
+			Config.UseBlizzysToolbarChanged += Settings_UseBlizzysToolbarChanged;
+			
+			// Help window
+			_helpWindow = new HelpWindow( this );
+			_logger.Info( "Made Windows" );
+
+
+
+
+
+
             pdata = new ProtractorData();
             pcalcs = new ProtractorCalcs(pdata);
-
-            lastknownmainbody = FlightGlobals.fetch.activeVessel.mainBody;
-
-            isInitialized = true;
-
-            bodycolorlist.Add("Kerbin", Utils.hextorgb("a3ede4"));
-            bodycolorlist.Add("Moho", Utils.hextorgb("c46a4b"));
-            bodycolorlist.Add("Eve", Utils.hextorgb("d3adff"));
-            bodycolorlist.Add("Duna", Utils.hextorgb("edb4a6"));
-            bodycolorlist.Add("Jool", Utils.hextorgb("8cf068"));
-            bodycolorlist.Add("Vall", Utils.hextorgb("969ebf"));
-            bodycolorlist.Add("Laythe", Utils.hextorgb("90caeb"));
-            bodycolorlist.Add("Tylo", Utils.hextorgb("fedede"));
-            bodycolorlist.Add("Bop", Utils.hextorgb("b8a58b"));
-            bodycolorlist.Add("Ike", Utils.hextorgb("aeb5ca"));
-            bodycolorlist.Add("Gilly", Utils.hextorgb("b8a58b"));
-            bodycolorlist.Add("Mun", Utils.hextorgb("aeb5ca"));
-            bodycolorlist.Add("Minmus", Utils.hextorgb("a68db8"));
-            bodycolorlist.Add("Eeloo", Utils.hextorgb("929292"));
-            bodycolorlist.Add("Dres", Utils.hextorgb("917552"));
-            bodycolorlist.Add("Pol", Utils.hextorgb("929d6d"));
-
             if (!KACWrapper.InitKACWrapper())
             {
-                Debug.Log("Protractor: KAC integration initialized.");
+                _logger.Info("Protractor: KAC integration initialized.");
             }
-            Debug.Log("-------------Protractor Initialized-------------");
+            _logger.Info("-------------Protractor Initialized-------------");
+
+
+			DontDestroyOnLoad( this );
+			_logger.Info( "Protractor: Start DONE" );
         }
+
+
+
+		// Called by Unity when the application is destroyed.
+		protected void OnApplicationQuit( )
+		{
+		}
+
+
+
+		// Called by Unity when this instance is destroyed.
+        // If using Blizzy78's Toolbar, the button *must* be destroyed OnDestroy
+		protected void OnDestroy( )
+		{
+//			savesettings( );
+			GameEvents.onGUIApplicationLauncherReady.Remove( Load );
+			GameEvents.onGUIApplicationLauncherDestroyed.Remove( Unload );
+		}
+
+
+
+
+		// Called by Unity once per frame.
+		protected void Update( )
+		{
+		}
+
+
+
+        protected void FixedUpdate()
+        {
+            if( !HighLogic.LoadedSceneIsFlight )
+                return;
+			if( !FlightGlobals.ready )
+				return;
+
+            Vessel vessel = FlightGlobals.fetch.activeVessel;
+            if( vessel == FlightGlobals.ActiveVessel )
+            {
+                if( vessel.situation != Vessel.Situations.PRELAUNCH )
+                {
+                    totaldv += TimeWarp.fixedDeltaTime * pcalcs.thrustAccel();
+                    if( Config.TrackDv )
+                    {
+                        trackeddv += TimeWarp.fixedDeltaTime * pcalcs.thrustAccel();
+                    }
+                }
+
+                // Only recalculate data at fixed intervals (very roughly speaking)
+                t_lastUpdate += Time.deltaTime;
+                if (t_lastUpdate > Config.UpdateInterval)
+                {
+                    t_lastUpdate = 0.0f;
+                    // No need to update if not showing the GUI
+                    if (isVisible)
+                    {
+                        pcalcs.update(pdata.celestials);
+                    }
+                }
+            }
+			_logger.Info( "Protractor: FixedUpdate DONE" );
+        }
+
+
+
+		// Called by Unity to draw the GUI - can be called many times per frame.
+		protected void OnGUI( )
+		{
+			drawGUI( );
+		}
+		#endregion
+
+
+
+
+		#region METHODS Unity Event Callbacks
+		// Initializes the addon if it hasn't already been loaded.
+		// Callback from onGUIApplicationLauncherReady
+        private void Load( )
+        {
+			_logger.Info( "Protractor: Load" );
+			_logger.Info( "Adding Buttons" );
+			InitButtons( );
+			_logger.Info( "Buttons Added" );
+
+			_launcherVisible = true;
+			ApplicationLauncher.Instance.AddOnShowCallback( Launcher_Show );
+			ApplicationLauncher.Instance.AddOnHideCallback( Launcher_Hide );
+
+
+
+			//if( !FlightGlobals.ready ) return;
+			if( FlightGlobals.fetch.isActiveAndEnabled )
+			{
+				if( FlightGlobals.fetch.activeVessel )
+				{
+					lastknownmainbody = FlightGlobals.fetch.activeVessel.mainBody;
+					approach_obj = new GameObject("Line");
+					if ((windowPos.x == 0) && (windowPos.y == 0))//windowPos is used to position the GUI window, lets set it in the center of the screen
+					{
+						windowPos = new Rect(Screen.width / 2, Screen.height / 2, 10, 10);
+					}
+
+					approach_obj.layer = 9;
+					cam = (PlanetariumCamera)GameObject.FindObjectOfType(typeof(PlanetariumCamera));
+
+					approach = approach_obj.AddComponent<LineRenderer>();
+					approach.transform.parent = null;
+					approach.enabled = false;
+					approach.SetColors(Color.green, Color.green);
+					approach.useWorldSpace = true;
+					approach.SetVertexCount(2);
+					approach.SetWidth(10, 10);  //was 15, 5
+
+					approach.material = ((MapView)GameObject.FindObjectOfType(typeof(MapView))).orbitLinesMaterial;
+				}			
+			}
+
+
+
+
+
+
+
+			_logger.Info( "Protractor: Load DONE" );
+        }
+
+
+
+		private void Unload( )
+		{
+			_logger.Info( "Protractor: Unload" );
+			_logger.Info( "Removing Buttons" );
+			RemoveButtons( );
+			_logger.Info( "Removing Callbacks" );
+
+			ApplicationLauncher.Instance.RemoveOnShowCallback( Launcher_Show );
+			ApplicationLauncher.Instance.RemoveOnHideCallback( Launcher_Hide );
+			_launcherVisible = false;
+			_logger.Info( "Protractor: Unload DONE" );
+		}
+
+
+
+		// F2 support
+		void OnHideUI( )
+		{
+			_UiHidden = true;
+		}
+		void OnShowUI( )
+		{
+			_UiHidden = false;
+		}
+
+
+
+		// Called when the KSP toolbar is shown.
+		private void Launcher_Show( )
+		{
+//			if( !_active )
+//				return;
+
+//			_logger.Trace("Launcher_Show");
+			_launcherVisible = true;
+		}
+
+
+
+		// Called when the KSP toolbar is hidden.
+		private void Launcher_Hide( )
+		{
+//			if( !_active )
+//				return;
+//			_logger.Trace( "Launcher_Hide" );
+			_launcherVisible = false;
+		}
+		#endregion
+
+
+
+
+
+		
+ 
+
+
+
+
+
+
+
+
 
         private void initGUI()
         {
@@ -219,217 +377,62 @@ namespace Protractor {
             isGUIInitialized = true;
         }
 
-        void OnGUIAppLauncherReady()
-        {
-			if( !this.appButton )
-            {
-                this.appButton = ApplicationLauncher.Instance.AddModApplication(
-                    delegate() {
-                        isVisible = true;
-                    },
-                    delegate() {
-                        isVisible = false;
-                    },
-                    null,
-                    null,
-                    null,
-                    null,
-                    ApplicationLauncher.AppScenes.FLIGHT | ApplicationLauncher.AppScenes.MAPVIEW,
-                    (Texture)GameDatabase.Instance.GetTexture("Protractor/icon", false));
-            }
-        }
 
-        public void drawGUI()
+
+
+        public void drawGUI( )
         {
+			_logger.Info( "Protractor: drawGUI" );
+			if( !UiActive( ) ) return;
+			if( !isVisible ) return;
+_logger.Trace( "drawGUI 1" );
+            if( !isGUIInitialized )
+                initGUI( );
+_logger.Trace( "drawGUI 2" );
+			_settingsWindow.DrawWindow( );
+_logger.Trace( "drawGUI 3" );
+			_helpWindow.DrawWindow( );
+_logger.Trace( "drawGUI 4" );
+
+
+
+
+
+
+//			if( !FlightGlobals.ready ) return;
+			if( !FlightGlobals.fetch.isActiveAndEnabled ) return;
+			if( FlightGlobals.fetch.activeVessel == null ) return;
+
+
             Vessel vessel = FlightGlobals.fetch.activeVessel;
 
-            if (!isInitialized)
-            {
-                initialize();
-            }
-            if (!isGUIInitialized)
-            {
-                LoadSkin((SkinType)skinId);
-                initGUI();
-            }
-            // OnDestroy gets called for us when another ship with Protractor exits physics range.
-            // So we constantly need to recheck and put it back if it's been zapped.
-            CreateToolbarButton();
 
             if (vessel == FlightGlobals.ActiveVessel)
             {
-                GUI.skin = null;
-                LoadSkin((SkinType)skinId);
-
                 if (isVisible)
                 {
-                    if (showmanual)
-                    {
-                        manualwindowPos = GUILayout.Window(555, manualwindowPos, manualGUI,
-                            "Protractor v." + version, GUILayout.Width(400), GUILayout.Height(500));
-                    }
-                    if (showsettings)
-                    {
-                        settingswindowPos = GUILayout.Window(557, settingswindowPos, settingsGUI,
-                            "Settings", GUILayout.Width(250), GUILayout.Height(100));
-                    }
-
-                    windowPos = GUILayout.Window(556, windowPos, mainGUI, "Protractor v." + version, GUILayout.Width(1), GUILayout.Height(1)); //367
+                    windowPos = GUILayout.Window(556, windowPos, mainGUI, "Protractor", GUILayout.Width(1), GUILayout.Height(1)); //367
                 }
                 else
                 {
                     approach.enabled = false;
                 }
             }
-        }
-
-        void Start()
-        {
-            if (!isInitialized)
-            {
-                initialize();
-            }
-            approach_obj = new GameObject("Line");
-            loadsettings();
-            if ((windowPos.x == 0) && (windowPos.y == 0))//windowPos is used to position the GUI window, lets set it in the center of the screen
-            {
-                windowPos = new Rect(Screen.width / 2, Screen.height / 2, 10, 10);
-            }
-
-            approach_obj.layer = 9;
-            cam = (PlanetariumCamera)GameObject.FindObjectOfType(typeof(PlanetariumCamera));
-
-            approach = approach_obj.AddComponent<LineRenderer>();
-            approach.transform.parent = null;
-            approach.enabled = false;
-            approach.SetColors(Color.green, Color.green);
-            approach.useWorldSpace = true;
-            approach.SetVertexCount(2);
-            approach.SetWidth(10, 10);  //was 15, 5
-
-            approach.material = ((MapView)GameObject.FindObjectOfType(typeof(MapView))).orbitLinesMaterial;
-
-            if (ToolbarManager.ToolbarAvailable)
-            {
-                Debug.Log("Protractor: Blizzy's toolbar present");
-                CreateToolbarButton();
-            }
-            else
-            {
-                Debug.Log("Protractor: Blizzy's toolbar NOT present");
-                //loadicons();
-                if (appButton == null)
-                {
-                    if (ApplicationLauncher.Ready)
-                    {
-                        OnGUIAppLauncherReady();
-                    }
-                }
-            }
-            //vessel.OnFlyByWire += new FlightInputCallback(fly);
-        }
-
-
-		/// <summary>
-		/// Called by Unity to draw the GUI - can be called many times per frame.
-		/// </summary>
-		public void OnGUI () {
-			drawGUI( );
-		}
-
-
-
-
-        private void CreateToolbarButton()
-        {
-            if (ToolbarManager.ToolbarAvailable)
-            {
-                if (button == null)
-                {
-                    button = ToolbarManager.Instance.add("Protractor", "protractorButton");
-                    button.TexturePath = "Protractor/icon";
-                    button.ToolTip = "Toggle Protractor UI";
-                    button.Visibility = new GameScenesVisibility(GameScenes.FLIGHT);
-                    button.OnClick += (e) => {
-                        isVisible = !isVisible;
-                    };
-                }
-            } else {
-                if (appButton == null)
-                {
-                    if (ApplicationLauncher.Ready)
-                    {
-                        OnGUIAppLauncherReady();
-                    }
-                }
-            }
-        }
-
-        // If using Blizzy78's Toolbar, the button *must* be destroyed OnDestroy
-		public void OnDestroy()
-		{
-		   savesettings();
-		   if (button != null)
-		   {
-			  button.Destroy();
-			  button = null;
-		   }
-
-		   if (!ToolbarManager.ToolbarAvailable)
-		   {
-			  GameEvents.onGUIApplicationLauncherReady.Remove(OnGUIAppLauncherReady);
-			  GameEvents.onGUIApplicationLauncherUnreadifying.Remove(OnGUIAppLauncherUnreadifying);
-
-			  if (appButton != null)
-			  {
-				 ApplicationLauncher.Instance.RemoveModApplication(appButton);
-			  }
-		   }
-		}
-
-        public void Update()
-        {
-
+			_logger.Info( "Protractor: drawGUI DONE" );
         }
 
 
 
-        public void FixedUpdate()
-        {
-            if (!HighLogic.LoadedSceneIsFlight)
-            {
-                return;
-            }
-
-
-            Vessel vessel = FlightGlobals.fetch.activeVessel;
-            if( vessel == FlightGlobals.ActiveVessel )
-            {
-                if( vessel.situation != Vessel.Situations.PRELAUNCH )
-                {
-                    totaldv += TimeWarp.fixedDeltaTime * pcalcs.thrustAccel();
-                    if (trackdv)
-                    {
-                        trackeddv += TimeWarp.fixedDeltaTime * pcalcs.thrustAccel();
-                    }
-                }
-
-                // Only recalculate data at fixed intervals (very roughly speaking)
-                t_lastUpdate += Time.deltaTime;
-                if (t_lastUpdate > updateInterval)
-                {
-                    t_lastUpdate = 0.0f;
-                    // No need to update if not showing the GUI
-                    if (isVisible)
-                    {
-                        pcalcs.update(pdata.celestials);
-                    }
-                }
-            }
-        }
 
         public void mainGUI(int windowID)
         {
+			if( !FlightGlobals.ready ) return;
+			if( !FlightGlobals.fetch.isActiveAndEnabled ) return;
+			if( !FlightGlobals.fetch.activeVessel ) return;
+
+
+
+
             Vessel vessel = FlightGlobals.fetch.activeVessel;
             if (vessel.mainBody != lastknownmainbody)
             {
@@ -446,11 +449,11 @@ namespace Protractor {
             dv_time = "Toggle between ΔV and ESTIMATED\nburn time at full thrust";
 
             printheaders();
-            if (showplanets)
+            if( Config.ShowPlanets )
             {
                 printplanetdata();
             }
-            if (showmoons)
+            if( Config.ShowMoons )
             {
                 printmoondata();
             }
@@ -486,165 +489,17 @@ namespace Protractor {
             GUI.DragWindow();
         }
 
-        public void settingsGUI(int windowID)
-        {
-            GUILayout.BeginVertical();
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("Update interval (secs): ");
 
-            updateIntervalString = GUILayout.TextField(updateIntervalString, 10);
-            try {
-                updateInterval = float.Parse(updateIntervalString);
-            } catch {
-                updateInterval = updateInterval_def;
-            }
-            if (updateInterval < 0.001f || updateInterval > 10.0f)
-            {
-                updateInterval = updateInterval_def;
-            }
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("KAC Alarm Margin (planets): ");
-            planetAlarmMargin_str = GUILayout.TextField(planetAlarmMargin_str, 10);
-            try {
-                planetAlarmMargin = float.Parse(planetAlarmMargin_str);
-            } catch {
-                planetAlarmMargin = planetAlarmMargin_def;
-            }
-            if (planetAlarmMargin < 0.0 || planetAlarmMargin > 60*60*ProtractorCalcs.HoursPerDay*5)
-            {
-                planetAlarmMargin = planetAlarmMargin_def;
-            }
-            GUILayout.Label("s");
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("KAC Alarm Margin (moons): ");
-            moonAlarmMargin_str = GUILayout.TextField(moonAlarmMargin_str, 10);
-            try {
-                moonAlarmMargin = float.Parse(moonAlarmMargin_str);
-            } catch {
-                moonAlarmMargin = moonAlarmMargin_def;
-            }
-            if (moonAlarmMargin < 0.0 || moonAlarmMargin > 60*60*ProtractorCalcs.HoursPerDay)
-            {
-                moonAlarmMargin = moonAlarmMargin_def;
-            }
-            GUILayout.Label("s");
-            GUILayout.EndHorizontal();
-
-            GUILayout.Label("Current skin: " + (SkinType)skinId );
-            if (GUI.skin == null || skinId != 1)
-            {
-                if (GUILayout.Button("KSP skin"))
-                {
-                    LoadSkin(SkinType.KSP);
-                    skinId = 1;
-                }
-            }
-            if (GUI.skin == null || skinId != 0)
-            {
-                if (GUILayout.Button("Unity Smoke skin"))
-                {
-                    LoadSkin(SkinType.Default);
-                    skinId = 0;
-                }
-            }
-            if (GUI.skin == null || skinId != 2)
-            {
-                if (GUILayout.Button("Compact skin"))
-                {
-                    LoadSkin(SkinType.Compact);
-                    skinId = 2;
-                }
-            }
-            GUILayout.EndVertical();
-            GUI.DragWindow();
-        }
-
-        public void manualGUI(int windowID)
-        {
-            GUIStyle wordWrapLabelStyle;
-            wordWrapLabelStyle = new GUIStyle();
-            wordWrapLabelStyle.wordWrap = true;
-            wordWrapLabelStyle.normal.textColor = Color.white;
-
-            scrollposition = GUILayout.BeginScrollView(scrollposition, false, true,
-                GUILayout.Width(600), GUILayout.Height(600));
-            GUILayout.Label(
-                "*****Tips*****\n\n" +
-                "- Click on the icon in the bottom left to hide Protractor and its windows\n" +
-                "- Click on the number in \"Closest\" column to toggle the closest approach line on the map\n" +
-                "- Click on the name of a celestial body in the list to hide other bodies.\n" +
-                "  Click on the θ angle or time display to create a KAC alarm, if present. Keep in mind\n" +
-                "    the time calculation assumes a circular orbit and may be off by varying degrees.\n" +
-                "- Click on θ in the column headers to toggle between displaying an angle and an \n" +
-                " approximate time until the next launch window.\n" +
-                "- Click on Ψ in the column headers to toggle between displaying and angle and an\n" +
-                " approximate time until the next ejection burn.\n" +
-                "- Click on Δv in the column headers to toggle between displaying estimated transfer\n" +
-                " delta V and an approximate burn time for that delta V in seconds. When engines are\n" +
-                " off, uses maximum thrust for current stage. When firing engines, uses the thrust at\n" +
-                " current throttle levels.\n" +
-                "- When a body is focused and an intercept is detected, your predicted inclination is \n" +
-                " displayed below the closest approach.\n\n" +
-                "*****Column Key*****\n\n" +
-                "θ: Difference in the current angle between bodies and the desired angle between \n" +
-                "   them for transfer. Launch your ship when this is 0.\n\n" +
-                "Ψ: Point in vessel's current orbit (relative to orbited body's prograde) where you \n" +
-                "   should start your ejection burn. Burn when this is 0.\n\n" +
-                "Δv: Amount your current velocity needs to be changed to accomplish maneuver.\n\n" +
-                "Adjust Ψ: Used to time escape. Toggle to adjust your escape angle based on your\n" +
-                "          craft's thrust capabilities.\n\n" +
-                "Closest: The closest approach between your craft and the target during one revolution.\n\n" +
-                "*****Instructions*****\n\n" +
-                "To use this guide, time warp until \"θ\" is 0. IT IS STRONGLY SUGGESTED TO DO \n" +
-                "THIS BEFORE LAUNCHING YOUR SHIP. This means the planets are in the right \n" +
-                "position relative to each other. \n" +
-                "Launch into a low orbit, then time warp until \"Ψ\" is 0. This means your vessel is \n" +
-                "in the right place in it's orbit. \n" +
-                "For best results, click \"Adjust Ψ\" or start your ejection burn before \n" +
-                "the Ψ hits 0 so that it does so when your burn is exactly 2/3 complete. \n" +
-                "Burn in direction of vessel's prograde until \"Δv\" is approximately 0.\"\n\n" +
-                "This mod assumes your craft is in a 0-inclination, circular orbit. Target is also \n" +
-                "assumed to be in 0-inclination, circular orbit. Either a 90° or 270° heading \n" +
-                "will work, though launching to 90° is more efficient. \n" +
-                "YOU WILL HAVE TO MAKE ADJUSTMENTS TO RENDEZVOUS. THIS MOD ONLY \n" +
-                "GETS YOU IN THE NEIGHBORHOOD. To close the gap, try burning at 90° angles \n" +
-                "(pro/retro, norm/antinorm, +rad/-rad).\n" +
-                "Eventually, you'll know which way to burn to correct an orbit.\n\n" +
-                "*****Advanced*****\n\n" +
-                "Only works when orbiting a moon. This data is designed to aid in travelling from \n" +
-                "a moon, to the moon's planet, and then to another moon. (e.g. Tylo -> Jool -> Kerbin). \n" +
-                "Adds \"Moon Ω\" column representing angle from moon to the prograde of the \n" + 
-                "planet that moon orbits. \n" +
-                "\"Alt\" above represents your target periapsis around the moon's planet where you \n" +
-                "should begin your ejection burn. \"Eject from [moon]\" " + "indicates where to \n" +
-                "leave your moon's orbit. To use this mode, wait until \"θ\" is 0, \"Moon Ω\" is 0, \n" +
-                "and \"Eject from [moon]\" is 0. Burn to create an orbit with an apoapsis at your \n" +
-                "current moon and a periapsis at \"Alt\". When you reach periapsis, burn for target \n" +
-                "planet.\n",
-                wordWrapLabelStyle
-            );
-            GUILayout.EndScrollView();
-            GUI.DragWindow();
-        }
       
-        public void switchcolor(string key)
+        public void switchcolor( CelestialBody body )
         {
-            Color col;
-            if (bodycolorlist.TryGetValue(key, out col))
-            {
-                datastyle.normal.textColor = col;
-                datatitle.normal.textColor = col;
-            }
-            else
-            {
-                datastyle.normal.textColor = Color.white;
-                datatitle.normal.textColor = Color.white;
-            }
-        }
+			Color col;
+			col = ( body.orbitDriver.Renderer.orbitColor * 2 ).A( 1 );
+
+            datastyle.normal.textColor = col;
+            datatitle.normal.textColor = col;
+		}
+
 
         public void printheaders()
         {
@@ -653,7 +508,7 @@ namespace Protractor {
             {
                 for (int i = 0; i <= 5; i++)
                 {
-                    if (i == 5 && (!showadvanced || pdata.getorbitbodytype() != ProtractorData.orbitbodytype.moon))
+                    if (i == 5 && (!Config.ShowAdvanced || pdata.getorbitbodytype() != ProtractorData.orbitbodytype.moon))
                     {
                         GUILayout.Label(new GUIContent("", ""), boldstyle);
                         continue;
@@ -726,7 +581,7 @@ namespace Protractor {
                 {
                     continue; //focus body defined and it isn't this one
                 }
-                switchcolor(planet.name);
+               	switchcolor(planet);
                 // Starts a row of planet data
                 GUILayout.BeginHorizontal(databox);
                 for (int i = 0; i <= 5; i++)
@@ -769,7 +624,7 @@ namespace Protractor {
                         if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
                         {
                             // Add KAC alarm on click
-                            AddAlarm(FlightGlobals.fetch.activeVessel.mainBody, planet, planetAlarmMargin, Planetarium.GetUniversalTime() + planetdata.theta_time);
+                            AddAlarm(FlightGlobals.fetch.activeVessel.mainBody, planet, Config.PlanetAlarmMargin, Planetarium.GetUniversalTime() + planetdata.theta_time);
                         }
 
                         break;
@@ -861,7 +716,7 @@ namespace Protractor {
                         }
                         break;
                     case 5:
-                        if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon && showadvanced)
+                        if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon && Config.ShowAdvanced)
                         {
                             GUILayout.Label(String.Format("{0:0.00}°", planetdata.adv_ejection_angle), datastyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         } else
@@ -886,7 +741,7 @@ namespace Protractor {
                 {
                     continue;
                 }
-                switchcolor(moon.name);
+                switchcolor(moon);
                 GUILayout.BeginHorizontal(databox);    //starts row of moon data
 
                 for (int i = 0; i <= 4; i++)
@@ -929,7 +784,7 @@ namespace Protractor {
                         // Add KAC Alarm on click
                         if ((Event.current.type == EventType.repaint) && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition) && Input.GetMouseButtonDown(0))
                         {
-                            AddAlarm(FlightGlobals.fetch.activeVessel.mainBody, moon, moonAlarmMargin, Planetarium.GetUniversalTime() + moondata.theta_time);
+                            AddAlarm(FlightGlobals.fetch.activeVessel.mainBody, moon, Config.MoonAlarmMargin, Planetarium.GetUniversalTime() + moondata.theta_time);
                         }
                         
                         break;
@@ -1035,19 +890,19 @@ namespace Protractor {
 
                 GUILayout.BeginVertical(GUILayout.Width(50));
                 {
-                    showplanets = GUILayout.Toggle(showplanets, "Planets", new GUIStyle(GUI.skin.button));
+                    Config.ShowPlanets = GUILayout.Toggle(Config.ShowPlanets, "Planets", new GUIStyle(GUI.skin.button));
                 }
                 GUILayout.EndVertical();
 
                 GUILayout.BeginVertical(GUILayout.Width(50));
                 {
-                    showmoons = GUILayout.Toggle(showmoons, "Moons", new GUIStyle(GUI.skin.button));
+                    Config.ShowMoons = GUILayout.Toggle(Config.ShowMoons, "Moons", new GUIStyle(GUI.skin.button));
                 }
                 GUILayout.EndVertical();
 
                 GUILayout.BeginVertical(GUILayout.Width(50));
                 {
-                    showdv = GUILayout.Toggle(showdv, "Show dV", new GUIStyle(GUI.skin.button));
+                    Config.ShowDv = GUILayout.Toggle(Config.ShowDv, "Show dV", new GUIStyle(GUI.skin.button));
                 }
                 GUILayout.EndVertical();
 
@@ -1055,7 +910,7 @@ namespace Protractor {
                 {
                     GUILayout.BeginVertical(GUILayout.Width(50));
                     {
-                        showadvanced = GUILayout.Toggle(showadvanced, "Adv", new GUIStyle(GUI.skin.button));
+                        Config.ShowAdvanced = GUILayout.Toggle(Config.ShowAdvanced, "Adv", new GUIStyle(GUI.skin.button));
                     }
                     GUILayout.EndVertical();
                 }
@@ -1079,20 +934,28 @@ namespace Protractor {
 
                 GUILayout.BeginVertical(GUILayout.Width(10));
                 {
-                    showsettings = GUILayout.Toggle(showsettings, "Settings", new GUIStyle(GUI.skin.button));
+					if (GUILayout.Button( "Settings", new GUIStyle( GUI.skin.button )))
+					{
+						_settingsWindow.ToggleVisible( );
+					}
+
+
                 }
                 GUILayout.EndVertical();
 
                 GUILayout.BeginVertical(GUILayout.Width(10));
                 {
-                    showmanual = GUILayout.Toggle(showmanual, "?", new GUIStyle(GUI.skin.button));
+					if (GUILayout.Button( "?", new GUIStyle( GUI.skin.button )))
+					{
+						_helpWindow.ToggleVisible( );
+					}
                 }
                 GUILayout.EndVertical();
 
                 GUILayout.EndHorizontal();
             }
 
-            if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon && showadvanced)
+            if (pdata.getorbitbodytype() == ProtractorData.orbitbodytype.moon && Config.ShowAdvanced)
             {
                 GUILayout.BeginHorizontal(databox);
                 {
@@ -1113,7 +976,7 @@ namespace Protractor {
                 GUILayout.EndHorizontal();
             }   //allow advanced menu
 
-            if (showdv)
+            if (Config.ShowDv)
             {
                 int w = 80;
                 boldstyle.alignment = TextAnchor.MiddleLeft;
@@ -1124,7 +987,7 @@ namespace Protractor {
                         GUILayout.BeginHorizontal();
                         {
                             GUILayout.Label(string.Format("Sum Δv: {0:#,#}", totaldv), boldstyle, GUILayout.ExpandWidth(true));
-                            trackdv = GUILayout.Toggle(trackdv, "Track", new GUIStyle(GUI.skin.button), GUILayout.Width(w));
+                            Config.TrackDv = GUILayout.Toggle(Config.TrackDv, "Track", new GUIStyle(GUI.skin.button), GUILayout.Width(w));
                         }
                         GUILayout.EndHorizontal();
 
@@ -1182,143 +1045,169 @@ namespace Protractor {
             }
 
         }
-        /*
-        public void fly(FlightCtrlState s)
-        {
-            throttle = s.mainThrottle;
-        }
-        */
 
-        /*
-         * SETTINGS.
-         */
-        public void savesettings()
-        {
-            if (!loaded)
-            {
-                return;
-            }
-            KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<Protractor>();
-            cfg["config_version"] = version;
-            cfg["mainpos"] = windowPos;
-            cfg["manualpos"] = manualwindowPos;
-            cfg["settingspos"] = settingswindowPos;
-            cfg["showadvanced"] = showadvanced;
-            cfg["adjustejectangle"] = adjustejectangle;
-            cfg["showmanual"] = showmanual;
-            cfg["showsettings"] = showsettings;
-            cfg["isvisible"] = isVisible;
-            cfg["showplanets"] = showplanets;
-            cfg["showmoons"] = showmoons;
-            cfg["showadvanced"] = showadvanced;
-            cfg["showdv"] = showdv;
-            cfg["trackdv"] = trackdv;
-            cfg["skinid"] = skinId;
-            cfg["updateinterval"] = updateInterval;
-            updateIntervalString = updateInterval.ToString("F2");
-            cfg["updateinterval"] = updateIntervalString;
-            planetAlarmMargin_str = planetAlarmMargin.ToString("F2");
-            cfg["planetalarmmargin"] = planetAlarmMargin_str;
-            moonAlarmMargin_str = moonAlarmMargin.ToString("F2");
-            cfg["moonalarmmargin"] = moonAlarmMargin_str;
 
-            Debug.Log("-------------Saved Protractor Settings-------------");
-            cfg.save();
-        }
 
-        public void loadsettings()
-        {
-            Debug.Log("-------------Loading settings...-------------");
-            KSP.IO.PluginConfiguration cfg = KSP.IO.PluginConfiguration.CreateForType<Protractor>();
-            cfg.load();
-            Debug.Log("-------------Settings Opened-------------");
-            windowPos = cfg.GetValue<Rect>("mainpos", new Rect(0, 0, 0, 0));
-            manualwindowPos = cfg.GetValue<Rect>("manualpos", new Rect(0, 0, 0, 0));
-            settingswindowPos = cfg.GetValue<Rect>("settingspos", new Rect(0, 0, 0, 0));
-            showadvanced = cfg.GetValue<bool>("showadvanced", true);
-            adjustejectangle = cfg.GetValue<bool>("adjustejectangle", false);
-            showmanual = cfg.GetValue<bool>("showmanual", false);
-            showsettings = cfg.GetValue<bool>("showsettings", false);
-            isVisible = cfg.GetValue<bool>("isvisible", true);
-            showplanets = cfg.GetValue<bool>("showplanets", true);
-            showmoons = cfg.GetValue<bool>("showmoons", true);
-            showdv = cfg.GetValue<bool>("showdv", true);
-            trackdv = cfg.GetValue<bool>("trackdv", true);
 
-            skinId = cfg.GetValue<int>("skinid", (int)Protractor.SkinType.Default);
 
-            updateIntervalString = cfg.GetValue<string>("updateinterval", "0.20");
-            try {
-                updateInterval = Single.Parse(updateIntervalString);
-            } catch {
-                updateInterval = updateInterval_def;
-            }
+		#region METHODS Window helper functions
+		// Teeny-tiny helper function.  Are we drawing windows or not
+		private bool UiActive( )
+		{
+			if( ( !_UiHidden ) && /*_active &&*/ _launcherVisible )
+				return true;
+			return false;
+		}
+		#endregion
 
-            planetAlarmMargin_str = cfg.GetValue<string>("planetalarmmargin", "3600");
-            try {
-                planetAlarmMargin = Single.Parse(planetAlarmMargin_str);
-            } catch {
-                planetAlarmMargin = planetAlarmMargin_def;
-            }
 
-            moonAlarmMargin_str = cfg.GetValue<string>("moonalarmmargin", "300");
-            try {
-                moonAlarmMargin = Single.Parse(moonAlarmMargin_str);
-            } catch {
-                moonAlarmMargin = moonAlarmMargin_def;
-            }
 
-            loaded = true;  //loaded
 
-            Debug.Log("-------------Loaded Protractor Settings-------------");
-        }
 
-        // More code from MechJeb2 for skin selection. Yay GPL3 licensing!
-        public static void CopyDefaultSkin()
-        {
-            GUI.skin = null;
-            defaultSkin = (GUISkin)GameObject.Instantiate(GUI.skin);
-        }
 
-        public static void CopyCompactSkin()
-        {
-            GUI.skin = null;
-            compactSkin = (GUISkin)GameObject.Instantiate(GUI.skin);
-            GUI.skin.name = "KSP Compact";
-            compactSkin.label.margin = new RectOffset(1, 1, 1, 1);
-            compactSkin.label.padding = new RectOffset(0, 0, 2, 2);
-            compactSkin.button.margin = new RectOffset(1, 1, 1, 1);
-            compactSkin.button.padding = new RectOffset(4, 4, 2, 2);
-            compactSkin.toggle.margin = new RectOffset(1, 1, 1, 1);
-            compactSkin.toggle.padding = new RectOffset(15, 0, 2, 0);
-            compactSkin.textField.margin = new RectOffset(1, 1, 1, 1);
-            compactSkin.textField.padding = new RectOffset(2, 2, 2, 2);
-            compactSkin.textArea.margin = new RectOffset(1, 1, 1, 1);
-            compactSkin.textArea.padding = new RectOffset(2, 2, 2, 2);
-            compactSkin.window.margin = new RectOffset(0, 0, 0, 0);
-            compactSkin.window.padding = new RectOffset(5, 5, 20, 5);
-        }
 
-        public static void LoadSkin(SkinType skinType)
-        {
-            GUI.skin = null;
-            switch (skinType)
-            {
-            case SkinType.Default:
-                if (defaultSkin == null) CopyDefaultSkin();
-                GUI.skin = defaultSkin;
-                break;
-            case SkinType.KSP:
-                GUI.skin = AssetBase.GetGUISkin("KSP window 2");
-                break;
-            case SkinType.Compact:
-                if (compactSkin == null) CopyCompactSkin();
-                GUI.skin = compactSkin;
-                break;
-            }
+		#region METHODS General Toolbar functions
 
-        }
+		// Initializes the toolbar button.
+		private void InitButtons( )
+		{
+			_logger.Info( "InitButtons" );
+			RemoveButtons( );
+			AddButtons( );
+			_logger.Info( "InitButtons Done" );
+		}
 
+
+
+		// Add the buttons
+		private void AddButtons( )
+		{
+			Texture2D StockTexture;
+
+
+
+			_protractorMainButton = new UnifiedButton( );
+
+
+
+			if( ZKeyButtons.BlizzysToolbarButton.IsAvailable )
+			{
+				_protractorMainButton.UseBlizzyIfPossible = true; //Config.UseBlizzysToolbar;
+
+
+
+
+				var texturePath = "protractor/protractor_small.png";
+				if( !GameDatabase.Instance.ExistsTexture( texturePath ) )
+				{
+					var texture = ZKeyLib.TextureHelper.FromResource( "protractor.icons.icon-small.png", 24, 24 );
+					var ti = new GameDatabase.TextureInfo( null, texture, false, true, true );
+					ti.name = texturePath;
+					GameDatabase.Instance.databaseTexture.Add( ti );
+				}
+				_logger.Info( "Load : Blizzy texture" );
+
+
+
+				_protractorMainButton.BlizzyNamespace = BLIZZY_NAMESPACE;
+				_protractorMainButton.BlizzyButtonId = "protractorButton";
+				_protractorMainButton.BlizzyToolTip = "Protractor";
+				_protractorMainButton.BlizzyText = "Protractor Transfer Calculator";
+				_protractorMainButton.BlizzyTexturePath = texturePath;
+				_protractorMainButton.BlizzyVisibility = new GameScenesVisibility( GameScenes.SPACECENTER, GameScenes.FLIGHT, GameScenes.TRACKSTATION );
+				_logger.Info( "Load : Set Blizzy Stuff" );
+			}
+			else
+				_logger.Info( "NoBlizzy!" );
+
+
+
+			StockTexture = ZKeyLib.TextureHelper.FromResource( "protractor.icons.icon.png", 38, 38 );
+			if( StockTexture != null )
+				_logger.Info( "Load : Stock texture" );
+			else
+				_logger.Info( "Load : cant load texture" );
+			_protractorMainButton.LauncherTexture = StockTexture;
+			_protractorMainButton.LauncherVisibility =
+				ApplicationLauncher.AppScenes.SPACECENTER |
+				ApplicationLauncher.AppScenes.FLIGHT |
+				ApplicationLauncher.AppScenes.MAPVIEW |
+				ApplicationLauncher.AppScenes.TRACKSTATION;
+			_logger.Info( "Load : Set Stock Stuff" );
+
+
+			_protractorMainButton.ButtonOn += Window_Open;
+			_protractorMainButton.ButtonOff += Window_Close;
+			_protractorMainButton.Add( );
+		}
+
+
+
+		private void RemoveButtons( )
+		{
+			if( _protractorMainButton != null )
+			{
+				_protractorMainButton.ButtonOn -= Window_Open;
+				_protractorMainButton.ButtonOff -= Window_Close;
+				_protractorMainButton.Remove( );
+				_protractorMainButton = null;
+			}
+		}
+		#endregion
+
+
+
+
+
+
+		#region METHODS Checklist window callbacks
+		// Registered with the button
+		// Called when the toolbar button for the checklist window is toggled on.
+		private void Window_Open( object sender, EventArgs e )
+		{
+//			if( !_active )
+//				return;
+			isVisible = true;
+			_logger.Info( "Window_Open" );
+//			UpdateChecklistVisibility( true );
+		}
+
+
+
+		// Registered with the button
+		// Called when the toolbar button for the checklist window is toggled off.
+		private void Window_Close( object sender, EventArgs e )
+		{
+//			if( !_active )
+//				return;
+			isVisible = false;
+			_logger.Info( "Window_Close" );
+//			UpdateChecklistVisibility( false );
+		}
+		#endregion
+
+
+
+
+		// We register this with the settings window.
+		// When the blizzy toolbar setting changes this gets popped so we can recreate the buttons
+		private void Settings_UseBlizzysToolbarChanged( object sender, EventArgs e )
+		{
+			InitButtons( );
+
+
+			// Need to set this
+			if( isVisible )
+				_protractorMainButton.SetOn( );
+			else
+				_protractorMainButton.SetOff( );
+
+		}
+
+
+
+
+/*
         // from http://wiki.unity3d.com/index.php?title=PopupList
         public static bool List(Rect position, ref bool showList, ref int listEntry,
             GUIContent buttonContent, string[] list, GUIStyle listStyle)
@@ -1359,6 +1248,13 @@ namespace Protractor {
             }
             return done;
         }
+
+
+
+		*/
+
+
+
     } // end of class
 
 } //end of namespace
