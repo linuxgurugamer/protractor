@@ -45,6 +45,7 @@
     <Compile Include="Lib\TextureHelper.cs" />
     <Compile Include="Lib\Utilities.cs" />
     <Compile Include="Lib\Window.cs" />
+    <Compile Include="MainWindow.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="KACWrapper.cs" />
     <Compile Include="CelestialData.cs" />

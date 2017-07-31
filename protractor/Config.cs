@@ -23,6 +23,7 @@ namespace Protractor
 			private bool _showDv;
 			private bool _trackDv;
 			private bool _useBlizzysToolbar;
+			private bool _adjustejectangle;
 
 
 
@@ -37,13 +38,13 @@ namespace Protractor
 			public bool ShowDv							{ get { return _showDv; }						set { if( _showDv != value ) { _showDv = value; } } }
 			public bool TrackDv							{ get { return _trackDv; }						set { if( _trackDv != value ) { _trackDv = value; } } }
 			public bool UseBlizzysToolbar				{ get { return _useBlizzysToolbar; }			set { if( _useBlizzysToolbar != value ) { _useBlizzysToolbar = value; OnUseBlizzysToolbarChanged( ); } } }
+			public bool AdjustEjectAngle				{ get { return _adjustejectangle; }				set { if( _adjustejectangle != value ) { _adjustejectangle = value; } } }
 
 
 
 		// Get notified when settings change
 			public event EventHandler UseBlizzysToolbarChanged;
 
-			
 
 
 		// For triggering events
@@ -57,27 +58,19 @@ namespace Protractor
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 		public Config( )
 		{
 			_logger = new ZKeyLib.Logger( this );
+			_updateInterval = 0.2f;
+			_planetAlarmMargin = 60 * 60;
+			_moonAlarmMargin = 60 * 5;
+			_showPlanets = true;
+			_showMoons = true;
+			_showAdvanced = true;
+			_showDv = true;
+			_trackDv = true;
+			_useBlizzysToolbar = false;
+			_adjustejectangle = false;
 		}
 
 //
@@ -209,22 +202,18 @@ namespace Protractor
 
 		public void Load( )
 		{
-/*			_hideCompleteExperiments =		false;
-			_useBlizzysToolbar =			false;
-			_completeWithoutRecovery =		false;
-			_checkDebris =					false;
-			_allFilter =					true;
-			_stopTimeWarp =					true;
-			_playNoise =					true;
-			_showResultsWindow =			true;
-			_filterDifficultScience =		true;
-			_uiScale =						1f;
-			_musicStartsMuted =				false;
-			_righClickMutesMusic =			true;
-			_selectedObjectWindow =			true;
+			_updateInterval = 0.2f;
+			_planetAlarmMargin = 60 * 60;
+			_moonAlarmMargin = 60 * 5;
+			_showPlanets = true;
+			_showMoons = true;
+			_showAdvanced = true;
+			_showDv = true;
+			_trackDv = true;
+			_useBlizzysToolbar = false;
 
 
-
+/*	
 			try
 			{
 				if( File.Exists( _file ) )

@@ -1,8 +1,6 @@
 ﻿using System;
 using UnityEngine;
-
-
-
+using ZKeyButtons;
 
 
 
@@ -22,7 +20,7 @@ namespace Protractor
 		private readonly Protractor _parent;
 
 		public static readonly float updateInterval_def = 0.2f;
-		public string updateIntervalString = "0.20  ";
+		public string updateIntervalString = "0.20";
 
 		public static readonly double planetAlarmMargin_def = 60 * 60;
 		public string planetAlarmMargin_str = "3600.00";
@@ -32,22 +30,20 @@ namespace Protractor
 
 
 
-
-
-
-
-
-
-
 		// Constructor
 		public SettingsWindow( Protractor Parent )
-			: base( "Protractor Settings", 240, 360 )
+			: base( "Protractor Settings", 240, 240 )
 		{
 			_logger = new ZKeyLib.Logger( this );
 			_parent = Parent;
 			UiScale = 1; // Don't let this change
 			version = ZKeyLib.Utilities.GetDllVersion( this );
+
+			updateIntervalString = _parent.Config.UpdateInterval.ToString( "0.##" );
+			planetAlarmMargin_str = _parent.Config.PlanetAlarmMargin.ToString( "0.##" );
+			moonAlarmMargin_str = _parent.Config.MoonAlarmMargin.ToString( "0.##" );
 		}
+
 
 
 		// For our Window base class
@@ -64,8 +60,12 @@ namespace Protractor
 
 				toggleStyle = new GUIStyle( _skin.toggle );
 				sliderStyle = new GUIStyle( _skin.horizontalSlider );
+				
 				editStyle = new GUIStyle( _skin.textField );
+				editStyle.fontStyle = FontStyle.Normal;
+				
 				versionStyle = ZKeyLib.Utilities.GetVersionStyle( );
+
 				selectionStyle = new GUIStyle( _skin.button );
 				selectionStyle.margin = new RectOffset( 30, 0, 0, 0 );
 			}
@@ -76,17 +76,14 @@ namespace Protractor
 		// For our Window base class
 		protected override void DrawWindowContents( int windowID )
 		{
-			GUILayout.BeginVertical( );
-
-
-
-
-
+			bool save = false;
             GUILayout.BeginVertical();
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("Update interval (secs): ");
-
-            updateIntervalString = GUILayout.TextField(updateIntervalString, 10);
+            
+			
+			
+			GUILayout.BeginHorizontal();
+            GUILayout.Label( "Update interval (secs): ", labelStyle );
+            updateIntervalString = GUILayout.TextField( updateIntervalString, 10, editStyle );
             try {
                 _parent.Config.UpdateInterval = float.Parse(updateIntervalString);
             } catch {
@@ -98,9 +95,11 @@ namespace Protractor
             }
             GUILayout.EndHorizontal();
 
+
+
             GUILayout.BeginHorizontal();
-            GUILayout.Label("KAC Alarm Margin (planets): ");
-            planetAlarmMargin_str = GUILayout.TextField(planetAlarmMargin_str, 10);
+            GUILayout.Label("KAC Alarm Margin (planets): ", labelStyle);
+            planetAlarmMargin_str = GUILayout.TextField( planetAlarmMargin_str, 10, editStyle );
             try {
                 _parent.Config.PlanetAlarmMargin = float.Parse(planetAlarmMargin_str);
             } catch {
@@ -113,9 +112,11 @@ namespace Protractor
             GUILayout.Label("s");
             GUILayout.EndHorizontal();
 
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("KAC Alarm Margin (moons): ");
-            moonAlarmMargin_str = GUILayout.TextField(moonAlarmMargin_str, 10);
+
+
+            GUILayout.BeginHorizontal( );
+            GUILayout.Label( "KAC Alarm Margin (moons): ", labelStyle );
+            moonAlarmMargin_str = GUILayout.TextField( moonAlarmMargin_str, 10, editStyle );
             try {
                 _parent.Config.MoonAlarmMargin = float.Parse(moonAlarmMargin_str);
             } catch {
@@ -126,18 +127,30 @@ namespace Protractor
                 _parent.Config.MoonAlarmMargin = moonAlarmMargin_def;
             }
             GUILayout.Label("s");
-            GUILayout.EndHorizontal();
+            GUILayout.EndHorizontal( );
+
+
+
+			if( BlizzysToolbarButton.IsAvailable )
+			{
+				GUILayout.BeginHorizontal( );
+				var toggle = GUILayout.Toggle( _parent.Config.UseBlizzysToolbar, new GUIContent( "Use blizzy78's toolbar", "Remove Protractor button from stock toolbar and add to blizzy78 toolbar." ), toggleStyle );
+				if( toggle != _parent.Config.UseBlizzysToolbar )
+				{
+					_parent.Config.UseBlizzysToolbar = toggle;
+					save = true;
+				}
+				GUILayout.EndHorizontal( );
+			}
+
+
+
             GUILayout.EndVertical();
-
-
-
-
-
-
-
-			GUILayout.EndVertical( );
 			GUILayout.Space(10);
 			GUI.Label( new Rect( 4, windowPos.height - 13, windowPos.width - 20, 12 ), "Protractor V" + version, versionStyle );
+
+			if( save )
+				_parent.Config.Save( );
 		}
 	}
 }

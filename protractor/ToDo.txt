@@ -9,22 +9,19 @@
 [DONE] Class for help window
 [DONE] Class for settings window
 [DONE] Using internal values for orbit renderer
+[DONE] KAC Alarm wrong settings
+[DONE] Correct help text
+[DONE] Class for main window
+[DONE] Class for Config
+[DONE] Settings editable
+[DONE] Blizzy settings
 
-Class for Config
+Load/Save settings
 Store window pos
-Settings editable
-Correct help text
-
-
-
-
-KAC Alarm wrong settings
-
-
-Class for main window
+Do we have body or vessel?
 Show in KSC
 Show in Tracking station
 New icons
-Do we have body or vessel?
-
-
+Bug focusing/unfocuing body - throws exceptions
+Move green aproach line into own class
+Moon/Planet code - seems to hav a lot of duplication
